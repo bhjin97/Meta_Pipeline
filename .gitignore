@@ -1,0 +1,20 @@
+# Python 가상환경 
+.venv/
+venv/
+ENV/
+
+# Python 컴파일 파일 및 캐시
+__pycache__/
+*.py[cod]
+*$py.class
+
+# 데이터 및 로그 파일 
+*.log
+origin_data_processing/data/raw/
+
+# OS 관련 설정 파일
+.DS_Store
+Thumbs.db
+
+# VS Code 설정
+.vscode/
