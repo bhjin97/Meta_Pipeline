@@ -1,5 +1,5 @@
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import col
+from pyspark.sql.functions import col, concat_ws, lit
 from faker import Faker
 import random
 
@@ -103,6 +103,7 @@ def main():
         .csv(f"{RAW_PATH}/olist_order_items_dataset.csv")
         .select(
             "order_id",
+            "order_item_id",
             "product_id",
             "seller_id",
             "price",
@@ -137,20 +138,49 @@ def main():
         )
     )
 
+    #  Sellers
+    sellers_df = (
+        spark.read.option("header", True)
+        .option("inferSchema", True)
+        .csv(f"{RAW_PATH}/olist_sellers_dataset.csv")
+        .select(
+            "seller_id",
+            "seller_zip_code_prefix",
+            "seller_city",
+            "seller_state"
+        )
+    )
+
     # 6. Join
     # 상품 단위 이벤트이므로 payments 테이블은 조인하지 않음
     event_df = (
         orders_df
         .join(customers_df, "customer_id", "left")
-        .join(order_items_df, "order_id", "left")
+        .join(order_items_df, "order_id", "inner")
         .join(products_df, "product_id", "left")
+        .join(sellers_df, "seller_id", "left")
     )
 
-    # 7. 상품 단위 총 금액 생성
-    # total_price = 상품 가격 + 해당 상품 배송비
-    event_df = event_df.withColumn(
-        "total_price",
-        col("price") + col("freight_value")
+    # 7. 이벤트 메타데이터 생성
+    event_df = (
+        event_df
+        .withColumn(
+            "event_type",
+            lit("ITEM_PURCHASED")
+        )
+        .withColumn(
+            "event_time",
+            col("order_purchase_timestamp")
+        )
+        .withColumn(
+            "event_id",
+            concat_ws(
+                "_",
+                lit("ITEM_PURCHASED"),
+                col("order_id"),
+                col("order_item_id")
+            )
+        )
     )
 
     # 8. Kafka 이벤트 시간 기준 정렬
