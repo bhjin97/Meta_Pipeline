@@ -18,3 +18,16 @@ Thumbs.db
 
 # VS Code 설정
 .vscode/
+
+# Spark/Hadoop metadata & checksums
+**/_SUCCESS
+**/*.crc
+
+# Spark/Hadoop temporary & hidden part files
+**/.*.part-*
+**/.part-*
+**/part-*
+
+# 모든 데이터 출력 결과물을 제외
+# output/
+# temp/
