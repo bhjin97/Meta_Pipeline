@@ -1,0 +1,5 @@
+pyspark
+pandas
+faker
+kafka-python
+python-dotenv
