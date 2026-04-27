@@ -7,9 +7,7 @@ from kafka import KafkaProducer
 BOOTSTRAP_SERVERS = ["kafka:29092"]
 TOPIC_NAME = "order-events"
 
-# docker-compose에서 kafka/ 폴더를 /app으로 마운트했다면
-# /app 기준으로 ../data/events 접근이 안 될 수 있음.
-# 그래서 compose volume 구조에 따라 경로를 맞춰야 함.
+# 경로 변경 시 체크 할 것
 EVENT_FILE_PATH = Path("/app/data/events/order_events.jsonl")
 
 
