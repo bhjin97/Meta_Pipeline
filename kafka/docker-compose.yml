@@ -9,9 +9,9 @@ services:
     ports:
       - "2181:2181"
 
-  kafka1:
+  kafka:
     image: confluentinc/cp-kafka:7.3.2
-    container_name: kafka1
+    container_name: kafka
     depends_on:
       - zookeeper
     ports:
@@ -19,46 +19,18 @@ services:
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka1:29092,PLAINTEXT_HOST://localhost:9092
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
-      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
-
-  kafka2:
-    image: confluentinc/cp-kafka:7.3.2
-    container_name: kafka2
-    depends_on:
-      - zookeeper
-    ports:
-      - "9093:9093"
-    environment:
-      KAFKA_BROKER_ID: 2
-      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka2:29092,PLAINTEXT_HOST://localhost:9093
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
-      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
-
-  kafka3:
-    image: confluentinc/cp-kafka:7.3.2
-    container_name: kafka3
-    depends_on:
-      - zookeeper
-    ports:
-      - "9094:9094"
-    environment:
-      KAFKA_BROKER_ID: 3
-      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka3:29092,PLAINTEXT_HOST://localhost:9094
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:29092,PLAINTEXT_HOST://0.0.0.0:9092
+      # 내부 + 외부 접속 설정
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
 
   producer:
-    build: .
+    build: ./producer
     container_name: producer
     depends_on:
-      - kafka1
-      - kafka2
-      - kafka3
+      - kafka
     volumes:
-      - .:/app
+      - ..:/app
     working_dir: /app
-    command: ["python", "producer.py"]
+    command: ["python", "kafka/producer/producer.py"]
