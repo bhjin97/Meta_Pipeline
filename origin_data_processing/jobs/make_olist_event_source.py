@@ -1,204 +1,187 @@
-from pyspark.sql import SparkSession
-from pyspark.sql.functions import col, concat_ws, lit
-from faker import Faker
-import random
+import json
+from pathlib import Path
+
+import pandas as pd
 
 
-RAW_PATH = "data/raw"
-OUTPUT_PATH = "data/event_source/olist_item_events"
+RAW_PATH = Path("origin_data_processing/data/raw")
+OUTPUT_PATH = Path("origin_data_processing/data/event_source")
+
+OUTPUT_PATH.mkdir(parents=True, exist_ok=True)
 
 
-def create_fake_customer_profiles(spark, customers_df):
-    fake = Faker("pt_BR")
-    random.seed(42)
-    Faker.seed(42)
+def format_datetime_columns(df, columns):
+    for column in columns:
+        df[column] = pd.to_datetime(df[column], errors="coerce")
+    return df
 
-    unique_customers = (
-        customers_df
-        .select("customer_unique_id")
-        .distinct()
-        .collect()
-    )
 
-    rows = []
+def to_event_time(series):
+    return series.dt.strftime("%Y-%m-%d %H:%M:%S")
 
-    for row in unique_customers:
-        customer_unique_id = row["customer_unique_id"]
 
-        gender = random.choice(["male", "female"])
-        age = random.randint(18, 70)
-
-        rows.append((
-            customer_unique_id,
-            fake.name(),
-            fake.email(),
-            fake.phone_number(),
-            age,
-            gender
-        ))
-
-    return spark.createDataFrame(
-        rows,
-        [
-            "customer_unique_id",
-            "customer_name",
-            "customer_email",
-            "customer_phone",
-            "customer_age",
-            "customer_gender"
-        ]
-    )
+def save_jsonl(df, path):
+    with open(path, "w", encoding="utf-8") as f:
+        for record in df.to_dict(orient="records"):
+            f.write(json.dumps(record, ensure_ascii=False) + "\n")
 
 
 def main():
-    spark = (
-        SparkSession.builder
-        .appName("Make Olist Item Events")
-        .getOrCreate()
+    # =========================
+    # 1. Load Data
+    # =========================
+    orders = pd.read_csv(f"{RAW_PATH}/olist_orders_dataset.csv")
+    reviews = pd.read_csv(f"{RAW_PATH}/olist_order_reviews_dataset.csv")
+
+    orders = format_datetime_columns(
+        orders,
+        [
+            "order_purchase_timestamp",
+            "order_approved_at",
+            "order_delivered_carrier_date",
+            "order_delivered_customer_date",
+            "order_estimated_delivery_date",
+        ],
     )
 
-    # 1. Customers
-    customers_df = (
-        spark.read.option("header", True)
-        .option("inferSchema", True)
-        .csv(f"{RAW_PATH}/olist_customers_dataset.csv")
-        .select(
-            "customer_id",
-            "customer_unique_id",
-            "customer_city",
-            "customer_state"
-        )
+    reviews = format_datetime_columns(
+        reviews,
+        [
+            "review_creation_date",
+            "review_answer_timestamp",
+        ],
     )
 
-    # Faker 고객 프로필 생성 후 customer_unique_id 기준으로 붙이기
-    fake_customer_profiles_df = create_fake_customer_profiles(
-        spark,
-        customers_df
+    # =========================
+    # 2. ORDER EVENTS
+    # =========================
+
+    order_created = orders.dropna(subset=["order_purchase_timestamp"]).copy()
+    order_created["event_type"] = "ORDER_CREATED"
+    order_created["event_time"] = to_event_time(order_created["order_purchase_timestamp"])
+    order_created["event_id"] = order_created["event_type"] + "_" + order_created["order_id"]
+
+    order_approved = orders.dropna(subset=["order_approved_at"]).copy()
+    order_approved["event_type"] = "ORDER_APPROVED"
+    order_approved["event_time"] = to_event_time(order_approved["order_approved_at"])
+    order_approved["event_id"] = order_approved["event_type"] + "_" + order_approved["order_id"]
+
+    order_canceled = orders[
+        (orders["order_status"] == "canceled")
+        & (orders["order_purchase_timestamp"].notna())
+    ].copy()
+    order_canceled["event_type"] = "ORDER_CANCELED"
+    order_canceled["event_time"] = to_event_time(order_canceled["order_purchase_timestamp"])
+    order_canceled["event_id"] = order_canceled["event_type"] + "_" + order_canceled["order_id"]
+
+    order_events = pd.concat(
+        [order_created, order_approved, order_canceled],
+        ignore_index=True,
     )
 
-    customers_df = (
-        customers_df
-        .join(fake_customer_profiles_df, "customer_unique_id", "left")
-    )
-
-    # 2. Orders
-    orders_df = (
-        spark.read.option("header", True)
-        .option("inferSchema", True)
-        .csv(f"{RAW_PATH}/olist_orders_dataset.csv")
-        .select(
+    order_events = order_events[
+        [
+            "event_id",
+            "event_type",
+            "event_time",
             "order_id",
             "customer_id",
             "order_status",
-            "order_purchase_timestamp",
-            "order_delivered_carrier_date",
-            "order_delivered_customer_date"
-        )
+        ]
+    ].sort_values("event_time")
+
+    # =========================
+    # 3. DELIVERY EVENTS
+    # =========================
+    # canceled 주문은 배송 이벤트에서 제외
+    valid_delivery_orders = orders[orders["order_status"] != "canceled"].copy()
+
+    delivery_started = valid_delivery_orders.dropna(
+        subset=["order_delivered_carrier_date"]
+    ).copy()
+    delivery_started["event_type"] = "DELIVERY_STARTED"
+    delivery_started["event_time"] = to_event_time(
+        delivery_started["order_delivered_carrier_date"]
+    )
+    delivery_started["event_id"] = (
+        delivery_started["event_type"] + "_" + delivery_started["order_id"]
     )
 
-    # 3. Order Items
-    order_items_df = (
-        spark.read.option("header", True)
-        .option("inferSchema", True)
-        .csv(f"{RAW_PATH}/olist_order_items_dataset.csv")
-        .select(
-            "order_id",
-            "order_item_id",
-            "product_id",
-            "seller_id",
-            "price",
-            "freight_value"
-        )
+    delivery_completed = valid_delivery_orders.dropna(
+        subset=["order_delivered_customer_date"]
+    ).copy()
+    delivery_completed["event_type"] = "DELIVERY_COMPLETED"
+    delivery_completed["event_time"] = to_event_time(
+        delivery_completed["order_delivered_customer_date"]
+    )
+    delivery_completed["event_id"] = (
+        delivery_completed["event_type"] + "_" + delivery_completed["order_id"]
     )
 
-    # 4. Products
-    products_df = (
-        spark.read.option("header", True)
-        .option("inferSchema", True)
-        .csv(f"{RAW_PATH}/olist_products_dataset.csv")
-        .select(
-            "product_id",
-            "product_category_name"
-        )
+    delivery_events = pd.concat(
+        [delivery_started, delivery_completed],
+        ignore_index=True,
     )
 
-    # 5. Category Translation
-    category_translation_df = (
-        spark.read.option("header", True)
-        .option("inferSchema", True)
-        .csv(f"{RAW_PATH}/product_category_name_translation.csv")
-    )
-
-    products_df = (
-        products_df
-        .join(category_translation_df, "product_category_name", "left")
-        .select(
-            "product_id",
-            col("product_category_name_english").alias("product_category")
-        )
-    )
-
-    #  Sellers
-    sellers_df = (
-        spark.read.option("header", True)
-        .option("inferSchema", True)
-        .csv(f"{RAW_PATH}/olist_sellers_dataset.csv")
-        .select(
-            "seller_id",
-            "seller_zip_code_prefix",
-            "seller_city",
-            "seller_state"
-        )
-    )
-
-    # 6. Join
-    # 상품 단위 이벤트이므로 payments 테이블은 조인하지 않음
-    event_df = (
-        orders_df
-        .join(customers_df, "customer_id", "left")
-        .join(order_items_df, "order_id", "inner")
-        .join(products_df, "product_id", "left")
-        .join(sellers_df, "seller_id", "left")
-    )
-
-    # 7. 이벤트 메타데이터 생성
-    event_df = (
-        event_df
-        .withColumn(
-            "event_type",
-            lit("ITEM_PURCHASED")
-        )
-        .withColumn(
-            "event_time",
-            col("order_purchase_timestamp")
-        )
-        .withColumn(
+    delivery_events = delivery_events[
+        [
             "event_id",
-            concat_ws(
-                "_",
-                lit("ITEM_PURCHASED"),
-                col("order_id"),
-                col("order_item_id")
-            )
-        )
+            "event_type",
+            "event_time",
+            "order_id",
+            "customer_id",
+            "order_status",
+            "order_estimated_delivery_date",
+        ]
+    ].copy()
+
+    delivery_events["order_estimated_delivery_date"] = to_event_time(
+        delivery_events["order_estimated_delivery_date"]
     )
 
-    # 8. Kafka 이벤트 시간 기준 정렬
-    event_df = event_df.orderBy("order_purchase_timestamp")
+    delivery_events = delivery_events.sort_values("event_time")
 
-    # 9. Kafka Producer가 읽기 좋은 JSON Lines 형태로 저장
-    (
-        event_df
-        .coalesce(1)
-        .write
-        .mode("overwrite")
-        .json(OUTPUT_PATH)
+    # =========================
+    # 4. REVIEW EVENTS
+    # =========================
+
+    reviews = reviews.merge(
+        orders[["order_id", "customer_id"]],
+        on="order_id",
+        how="left",
     )
 
-    print("Olist item event source data created successfully.")
-    print(f"Output path: {OUTPUT_PATH}")
+    review_events = reviews.dropna(subset=["review_creation_date"]).copy()
+    review_events["event_type"] = "REVIEW_CREATED"
+    review_events["event_time"] = to_event_time(review_events["review_creation_date"])
+    review_events["event_id"] = (
+        review_events["event_type"] + "_" + review_events["review_id"]
+    )
 
-    spark.stop()
+    review_events = review_events[
+        [
+            "event_id",
+            "event_type",
+            "event_time",
+            "review_id",
+            "order_id",
+            "customer_id",
+            "review_score",
+        ]
+    ].sort_values("event_time")
+
+    # =========================
+    # 5. SAVE
+    # =========================
+
+    save_jsonl(order_events, OUTPUT_PATH / "order_events.jsonl")
+    save_jsonl(delivery_events, OUTPUT_PATH / "delivery_events.jsonl")
+    save_jsonl(review_events, OUTPUT_PATH / "review_events.jsonl")
+
+    print("이벤트 생성 완료")
+    print(f"order_events: {len(order_events):,}")
+    print(f"delivery_events: {len(delivery_events):,}")
+    print(f"review_events: {len(review_events):,}")
 
 
 if __name__ == "__main__":
