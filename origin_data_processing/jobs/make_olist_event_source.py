@@ -1,6 +1,7 @@
 import json
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 
 
@@ -27,9 +28,6 @@ def save_jsonl(df, path):
 
 
 def main():
-    # =========================
-    # 1. Load Data
-    # =========================
     orders = pd.read_csv(f"{RAW_PATH}/olist_orders_dataset.csv")
     reviews = pd.read_csv(f"{RAW_PATH}/olist_order_reviews_dataset.csv")
 
@@ -53,25 +51,46 @@ def main():
     )
 
     # =========================
-    # 2. ORDER EVENTS
+    # 1. ORDER EVENTS
     # =========================
 
     order_created = orders.dropna(subset=["order_purchase_timestamp"]).copy()
     order_created["event_type"] = "ORDER_CREATED"
-    order_created["event_time"] = to_event_time(order_created["order_purchase_timestamp"])
+    order_created["event_time_dt"] = order_created["order_purchase_timestamp"]
+    order_created["event_time"] = to_event_time(order_created["event_time_dt"])
     order_created["event_id"] = order_created["event_type"] + "_" + order_created["order_id"]
 
     order_approved = orders.dropna(subset=["order_approved_at"]).copy()
     order_approved["event_type"] = "ORDER_APPROVED"
-    order_approved["event_time"] = to_event_time(order_approved["order_approved_at"])
+    order_approved["event_time_dt"] = order_approved["order_approved_at"]
+    order_approved["event_time"] = to_event_time(order_approved["event_time_dt"])
     order_approved["event_id"] = order_approved["event_type"] + "_" + order_approved["order_id"]
 
     order_canceled = orders[
         (orders["order_status"] == "canceled")
         & (orders["order_purchase_timestamp"].notna())
     ].copy()
+
     order_canceled["event_type"] = "ORDER_CANCELED"
-    order_canceled["event_time"] = to_event_time(order_canceled["order_purchase_timestamp"])
+
+    rng = np.random.default_rng(seed=42)
+
+    cancel_base_time = order_canceled["order_approved_at"].fillna(
+        order_canceled["order_purchase_timestamp"]
+    )
+
+    random_delay_seconds = rng.integers(
+        low=60,
+        high=3600,
+        size=len(order_canceled),
+    )
+
+    order_canceled["event_time_dt"] = (
+        cancel_base_time
+        + pd.to_timedelta(random_delay_seconds, unit="s")
+    )
+
+    order_canceled["event_time"] = to_event_time(order_canceled["event_time_dt"])
     order_canceled["event_id"] = order_canceled["event_type"] + "_" + order_canceled["order_id"]
 
     order_events = pd.concat(
@@ -79,21 +98,34 @@ def main():
         ignore_index=True,
     )
 
-    order_events = order_events[
-        [
-            "event_id",
-            "event_type",
-            "event_time",
-            "order_id",
-            "customer_id",
-            "order_status",
-        ]
-    ].sort_values("event_time")
+    priority_map = {
+        "ORDER_CREATED": 1,
+        "ORDER_APPROVED": 2,
+        "ORDER_CANCELED": 3,
+    }
 
+    order_events["priority"] = order_events["event_type"].map(priority_map)
+
+    order_events = (
+        order_events[
+            [
+                "event_id",
+                "event_type",
+                "event_time",
+                "event_time_dt",
+                "priority",
+                "order_id",
+                "customer_id",
+                "order_status",
+            ]
+        ]
+        .sort_values(["event_time_dt", "priority"])
+        .drop(columns=["event_time_dt", "priority"])
+    )
     # =========================
-    # 3. DELIVERY EVENTS
+    # 2. DELIVERY EVENTS
     # =========================
-    # canceled 주문은 배송 이벤트에서 제외
+
     valid_delivery_orders = orders[orders["order_status"] != "canceled"].copy()
 
     delivery_started = valid_delivery_orders.dropna(
@@ -142,7 +174,7 @@ def main():
     delivery_events = delivery_events.sort_values("event_time")
 
     # =========================
-    # 4. REVIEW EVENTS
+    # 3. REVIEW EVENTS
     # =========================
 
     reviews = reviews.merge(
@@ -171,7 +203,7 @@ def main():
     ].sort_values("event_time")
 
     # =========================
-    # 5. SAVE
+    # 4. SAVE
     # =========================
 
     save_jsonl(order_events, OUTPUT_PATH / "order_events.jsonl")
