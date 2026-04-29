@@ -1,5 +1,5 @@
-pyspark
-pandas
-faker
-kafka-python
-python-dotenv
+pyspark==3.5.1
+pandas==2.2.2
+faker==24.11.0
+kafka-python==2.0.2
+python-dotenv==1.0.1
