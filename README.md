@@ -40,3 +40,33 @@ Meta_Pipeline/
 │   └── jobs/                # 이벤트 생성 스크립트
 │
 └── README.md
+```
+
+---
+
+## 3. 🔄 데이터 흐름 (Data Flow)
+
+```text
+1. 원본 데이터 (CSV - Olist)
+    ↓
+2. 이벤트 생성 (PySpark / Python)
+    - 주문 / 배송 / 리뷰 데이터를 이벤트 형태(JSONL)로 변환
+    ↓
+3. Kafka Producer
+    - 생성된 이벤트를 Kafka Topic으로 전송
+    ↓
+4. Kafka Cluster
+    - order-events
+    - delivery-events
+    - review-events
+    ↓
+5. Kafka Consumer
+    - 이벤트를 구독하여 데이터 수신
+    ↓
+6. Sink 저장
+    - JSONL 파일 형태로 로컬 저장 (data/sink)
+```
+
+---
+
+
