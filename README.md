@@ -69,4 +69,34 @@ Meta_Pipeline/
 
 ---
 
+## 4. 🧰 사용 기술 (Tech Stack)
 
+### 📦 Data Processing
+![Spark](https://img.shields.io/badge/Apache%20Spark-E25A1C?style=for-the-badge&logo=apachespark&logoColor=white)
+![PySpark](https://img.shields.io/badge/PySpark-FF9900?style=for-the-badge&logo=apachespark&logoColor=white)
+![Python](https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white)
+
+---
+
+### 🚀 Data Streaming
+![Kafka](https://img.shields.io/badge/Apache%20Kafka-000000?style=for-the-badge&logo=apachekafka&logoColor=white)
+![Zookeeper](https://img.shields.io/badge/ZooKeeper-FF0000?style=for-the-badge&logo=apache&logoColor=white)
+
+---
+
+### 🐳 Infrastructure
+![Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white)
+![Docker Compose](https://img.shields.io/badge/Docker%20Compose-1488C6?style=for-the-badge&logo=docker&logoColor=white)
+![Oracle Cloud](https://img.shields.io/badge/Oracle%20Cloud-F80000?style=for-the-badge&logo=oracle&logoColor=white)
+
+---
+
+### 📊 Data Format
+![JSON](https://img.shields.io/badge/JSONL-000000?style=for-the-badge&logo=json&logoColor=white)
+![CSV](https://img.shields.io/badge/CSV-217346?style=for-the-badge&logo=microsoftexcel&logoColor=white)
+
+---
+
+### 🛠️ Development / Utility
+![Faker](https://img.shields.io/badge/Faker-3DDC84?style=for-the-badge&logo=python&logoColor=white)
+![Kafka UI](https://img.shields.io/badge/Kafka%20UI-2C2C2C?style=for-the-badge&logo=apachekafka&logoColor=white)
