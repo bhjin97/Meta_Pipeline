@@ -28,8 +28,8 @@ def save_jsonl(df, path):
 
 
 def main():
-    orders = pd.read_csv(f"{RAW_PATH}/olist_orders_dataset.csv")
-    reviews = pd.read_csv(f"{RAW_PATH}/olist_order_reviews_dataset.csv")
+    orders = pd.read_csv(RAW_PATH / "olist_orders_dataset.csv")
+    reviews = pd.read_csv(RAW_PATH / "olist_order_reviews_dataset.csv")
 
     orders = format_datetime_columns(
         orders,
@@ -89,7 +89,6 @@ def main():
         cancel_base_time
         + pd.to_timedelta(random_delay_seconds, unit="s")
     )
-
     order_canceled["event_time"] = to_event_time(order_canceled["event_time_dt"])
     order_canceled["event_id"] = order_canceled["event_type"] + "_" + order_canceled["order_id"]
 
@@ -122,6 +121,7 @@ def main():
         .sort_values(["event_time_dt", "priority"])
         .drop(columns=["event_time_dt", "priority"])
     )
+
     # =========================
     # 2. DELIVERY EVENTS
     # =========================
@@ -132,9 +132,8 @@ def main():
         subset=["order_delivered_carrier_date"]
     ).copy()
     delivery_started["event_type"] = "DELIVERY_STARTED"
-    delivery_started["event_time"] = to_event_time(
-        delivery_started["order_delivered_carrier_date"]
-    )
+    delivery_started["event_time_dt"] = delivery_started["order_delivered_carrier_date"]
+    delivery_started["event_time"] = to_event_time(delivery_started["event_time_dt"])
     delivery_started["event_id"] = (
         delivery_started["event_type"] + "_" + delivery_started["order_id"]
     )
@@ -143,9 +142,8 @@ def main():
         subset=["order_delivered_customer_date"]
     ).copy()
     delivery_completed["event_type"] = "DELIVERY_COMPLETED"
-    delivery_completed["event_time"] = to_event_time(
-        delivery_completed["order_delivered_customer_date"]
-    )
+    delivery_completed["event_time_dt"] = delivery_completed["order_delivered_customer_date"]
+    delivery_completed["event_time"] = to_event_time(delivery_completed["event_time_dt"])
     delivery_completed["event_id"] = (
         delivery_completed["event_type"] + "_" + delivery_completed["order_id"]
     )
@@ -155,23 +153,26 @@ def main():
         ignore_index=True,
     )
 
-    delivery_events = delivery_events[
-        [
-            "event_id",
-            "event_type",
-            "event_time",
-            "order_id",
-            "customer_id",
-            "order_status",
-            "order_estimated_delivery_date",
-        ]
-    ].copy()
-
     delivery_events["order_estimated_delivery_date"] = to_event_time(
         delivery_events["order_estimated_delivery_date"]
     )
 
-    delivery_events = delivery_events.sort_values("event_time")
+    delivery_events = (
+        delivery_events[
+            [
+                "event_id",
+                "event_type",
+                "event_time",
+                "event_time_dt",
+                "order_id",
+                "customer_id",
+                "order_status",
+                "order_estimated_delivery_date",
+            ]
+        ]
+        .sort_values("event_time_dt")
+        .drop(columns=["event_time_dt"])
+    )
 
     # =========================
     # 3. REVIEW EVENTS
@@ -185,22 +186,28 @@ def main():
 
     review_events = reviews.dropna(subset=["review_creation_date"]).copy()
     review_events["event_type"] = "REVIEW_CREATED"
-    review_events["event_time"] = to_event_time(review_events["review_creation_date"])
+    review_events["event_time_dt"] = review_events["review_creation_date"]
+    review_events["event_time"] = to_event_time(review_events["event_time_dt"])
     review_events["event_id"] = (
         review_events["event_type"] + "_" + review_events["review_id"]
     )
 
-    review_events = review_events[
-        [
-            "event_id",
-            "event_type",
-            "event_time",
-            "review_id",
-            "order_id",
-            "customer_id",
-            "review_score",
+    review_events = (
+        review_events[
+            [
+                "event_id",
+                "event_type",
+                "event_time",
+                "event_time_dt",
+                "review_id",
+                "order_id",
+                "customer_id",
+                "review_score",
+            ]
         ]
-    ].sort_values("event_time")
+        .sort_values("event_time_dt")
+        .drop(columns=["event_time_dt"])
+    )
 
     # =========================
     # 4. SAVE
