@@ -96,26 +96,62 @@ Meta_Pipeline/
 ## 3. 🔄 데이터 흐름 (Data Flow)
 
 ```text
-1. 원본 데이터 (CSV - Olist)
-    ↓
-2. 이벤트 생성 (PySpark / Python)
-    - 주문 / 배송 / 리뷰 데이터를 이벤트 형태(JSONL)로 변환
-    ↓
-3. Kafka Producer
-    - 생성된 이벤트를 Kafka Topic으로 전송
-    ↓
-4. Kafka Cluster
-    - order-events
-    - delivery-events
-    - review-events
-    ↓
-5. Kafka Consumer
-    - 이벤트를 구독하여 데이터 수신
-    ↓
-6. Sink 저장
-    - JSONL 파일 형태로 로컬 저장 (data/sink)
-```
+[Batch Pipeline]
 
+[Raw Data]
+Olist CSV + Persona Data
+    ↓
+[Bronze Layer] (MinIO)
+원본 데이터 Parquet 변환
+    ↓
+[Silver Layer] (MinIO)
+정제 / 조인 / 타입 변환
+    ↓
+[Gold Layer]
+- MinIO (Parquet) → 보관 및 재처리
+- PostgreSQL → 조회 및 BI
+
+[Streaming Pipeline]
+Kafka (Event Data)
+    ↓
+Spark Structured Streaming
+    ↓
+Real-time Metrics (PostgreSQL)
+
+```
+### 📥 Input Data (유입 데이터)
+
+#### 1. Olist E-Commerce Data (정적 데이터)
+
+- orders
+- order_items
+- customers
+- products
+- sellers
+- payments
+- reviews
+
+#### 2. Persona Data (보강 데이터) 
+
+- name
+- age
+- gender
+
+#### 3. Event Data (스트리밍 데이터)
+
+- ORDER_CREATED
+- ORDER_APPROVED
+- ORDER_CANCELED
+- ORDER_DELIVERED
+- DELIVERY_STARTED
+- DELIVERY_COMPLETED
+- REVIEW_CREATED
+
+Kafka Topics:
+
+- order-events
+- delivery-events
+- review-events
 ---
 
 ## 4. 🧰 사용 기술 (Tech Stack)
