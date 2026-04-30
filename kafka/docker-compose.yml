@@ -2,6 +2,8 @@ services:
   zookeeper:
     image: confluentinc/cp-zookeeper:7.3.2
     container_name: zookeeper
+    networks:
+      - data-pipeline-net
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
@@ -38,6 +40,8 @@ services:
   kafka-ui:
     image: provectuslabs/kafka-ui:latest
     container_name: kafka-ui
+    networks:
+      - data-pipeline-net
     depends_on:
       - kafka
     ports:
@@ -51,6 +55,8 @@ services:
   producer:
     build: ./producer
     container_name: producer
+    networks:
+      - data-pipeline-net
     depends_on:
       - kafka
     volumes:
@@ -61,6 +67,8 @@ services:
   consumer:
     build: ./consumer
     container_name: consumer
+    networks:
+      - data-pipeline-net
     depends_on:
       - kafka
     volumes:
