@@ -41,6 +41,55 @@ Meta_Pipeline/
 │
 └── README.md
 ```
+### 2. 🗂️ 최종 프로젝트 구조(예정)
+
+```text
+Meta_Pipeline/
+├── docker-compose.yml              # 전체 컨테이너 통합 실행 설정
+├── README.md
+├── requirements.txt
+├── .env                            # 환경변수 설정
+├── .gitignore
+│
+├── data/
+│   ├── raw/                        # 원본 Olist CSV 데이터
+│   ├── event_source/               # Kafka Producer 입력용 이벤트 JSONL
+│   ├── sink/                       # Kafka Consumer 저장 결과
+│   ├── checkpoint/                 # Spark Streaming checkpoint
+│   └── warehouse/                  # Spark 처리 결과 저장 영역
+│
+├── origin_data_processing/
+│   └── jobs/                       # 원본 CSV → 이벤트 데이터 생성 스크립트
+│
+├── kafka/
+│   ├── producer/                   # Kafka Producer 코드
+│   ├── consumer/                   # Kafka Consumer 코드
+│   └── config/                     # Kafka 관련 설정 파일
+│
+├── spark/
+│   ├── batch/                      # Spark Batch 처리 작업
+│   ├── streaming/                  # Spark Structured Streaming 작업
+│   ├── jobs/                       # 공통 Spark Job 스크립트
+│   └── config/                     # Spark 설정 파일
+│
+├── airflow/
+│   ├── dags/                       # Airflow DAG 파일
+│   ├── logs/                       # Airflow 실행 로그
+│   └── plugins/                    # Airflow 커스텀 플러그인
+│
+├── db/
+│   ├── init/                       # DB 초기화 SQL
+│   └── models/                     # 테이블 설계 및 데이터 모델링 문서
+│
+├── notebooks/                      # 실험 및 데이터 탐색용 노트북
+│
+├── docs/
+│   ├── architecture/               # 아키텍처 다이어그램
+│   ├── event_schema/               # 이벤트 스키마 문서
+│   └── data_modeling/              # Fact / Dimension 설계 문서
+│
+└── scripts/                        # 실행 보조 스크립트
+```
 
 ---
 
