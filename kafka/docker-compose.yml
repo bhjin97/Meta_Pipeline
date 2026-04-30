@@ -11,6 +11,8 @@ services:
   kafka:
     image: confluentinc/cp-kafka:7.3.2
     container_name: kafka
+    networks:
+      - data-pipeline-net
     depends_on:
       - zookeeper
     ports:
@@ -65,3 +67,7 @@ services:
       - ..:/app
     working_dir: /app
     command: ["python", "kafka/consumer/consumer.py"]
+
+networks:
+  data-pipeline-net:
+    external: true
