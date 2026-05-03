@@ -1,19 +1,19 @@
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import col, from_json, to_timestamp, window
-from pyspark.sql.types import StructType, StructField, StringType
+from pyspark.sql.functions import col, from_json, to_timestamp, window, avg, count
+from pyspark.sql.types import StructType, StructField, StringType, IntegerType
 
 
 KAFKA_BOOTSTRAP_SERVERS = "kafka:29092"
-TOPIC_NAME = "order-events"
+TOPIC_NAME = "review-events"
 
-OUTPUT_PATH = "/app/data/streaming/order_metrics"
-CHECKPOINT_PATH = "/app/data/checkpoints/order_metrics"
+OUTPUT_PATH = "/app/data/streaming/review_metrics"
+CHECKPOINT_PATH = "/app/data/checkpoints/review_metrics"
 
 
 def main():
     spark = (
         SparkSession.builder
-        .appName("Order Event Metrics Streaming")
+        .appName("Review Event Metrics Streaming")
         .master("spark://spark-master:7077")
         .getOrCreate()
     )
@@ -24,9 +24,10 @@ def main():
         StructField("event_id", StringType(), True),
         StructField("event_type", StringType(), True),
         StructField("event_time", StringType(), True),
+        StructField("review_id", StringType(), True),
         StructField("order_id", StringType(), True),
         StructField("customer_id", StringType(), True),
-        StructField("order_status", StringType(), True),
+        StructField("review_score", IntegerType(), True),
     ])
 
     kafka_df = (
@@ -57,12 +58,16 @@ def main():
             window(col("event_time"), "1 minute"),
             col("event_type")
         )
-        .count()
+        .agg(
+            count("*").alias("event_count"),
+            avg("review_score").alias("avg_review_score")
+        )
         .select(
             col("window.start").alias("window_start"),
             col("window.end").alias("window_end"),
             col("event_type"),
-            col("count").alias("event_count")
+            col("event_count"),
+            col("avg_review_score")
         )
     )
 

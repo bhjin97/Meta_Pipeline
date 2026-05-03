@@ -4,16 +4,16 @@ from pyspark.sql.types import StructType, StructField, StringType
 
 
 KAFKA_BOOTSTRAP_SERVERS = "kafka:29092"
-TOPIC_NAME = "order-events"
+TOPIC_NAME = "delivery-events"
 
-OUTPUT_PATH = "/app/data/streaming/order_metrics"
-CHECKPOINT_PATH = "/app/data/checkpoints/order_metrics"
+OUTPUT_PATH = "/app/data/streaming/delivery_metrics"
+CHECKPOINT_PATH = "/app/data/checkpoints/delivery_metrics"
 
 
 def main():
     spark = (
         SparkSession.builder
-        .appName("Order Event Metrics Streaming")
+        .appName("Delivery Event Metrics Streaming")
         .master("spark://spark-master:7077")
         .getOrCreate()
     )
@@ -26,7 +26,7 @@ def main():
         StructField("event_time", StringType(), True),
         StructField("order_id", StringType(), True),
         StructField("customer_id", StringType(), True),
-        StructField("order_status", StringType(), True),
+        StructField("delivery_status", StringType(), True),
     ])
 
     kafka_df = (
