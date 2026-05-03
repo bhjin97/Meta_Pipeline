@@ -26,9 +26,21 @@ services:
     networks:
       - data-pipeline-net
 
+  redis:
+    image: redis:7
+    container_name: redis
+    ports:
+      - "6379:6379"
+    networks:
+      - data-pipeline-net
+    volumes:
+      - redis-data:/data
+    command: ["redis-server", "--appendonly", "yes"]
+
 networks:
   data-pipeline-net:
     external: true
 
 volumes:
   spark-ivy:
+  redis-data:
