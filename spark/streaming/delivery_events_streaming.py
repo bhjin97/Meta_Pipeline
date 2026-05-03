@@ -1,3 +1,6 @@
+import json
+import redis
+
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import col, from_json, to_timestamp, window
 from pyspark.sql.types import StructType, StructField, StringType
@@ -5,15 +8,38 @@ from pyspark.sql.types import StructType, StructField, StringType
 
 KAFKA_BOOTSTRAP_SERVERS = "kafka:29092"
 TOPIC_NAME = "delivery-events"
-
-OUTPUT_PATH = "/app/data/streaming/delivery_metrics"
 CHECKPOINT_PATH = "/app/data/checkpoints/delivery_metrics"
+
+
+REDIS_HOST = "redis"
+REDIS_PORT = 6379
+REDIS_KEY_PREFIX = "streaming:delivery"
+
+
+def write_to_redis(df, batch_id):
+    if df.isEmpty():
+        return
+
+    r = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, decode_responses=True)
+
+    for row in df.collect():
+        key = f"{REDIS_KEY_PREFIX}:{row['event_type']}"
+        value = {
+            "window_start": str(row["window_start"]),
+            "window_end": str(row["window_end"]),
+            "event_type": row["event_type"],
+            "event_count": row["event_count"],
+            "batch_id": batch_id,
+        }
+        r.set(key, json.dumps(value, ensure_ascii=False))
+
+    print(f"[BATCH {batch_id}] order metrics saved to Redis")
 
 
 def main():
     spark = (
         SparkSession.builder
-        .appName("Delivery Event Metrics Streaming")
+        .appName("Order Event Metrics Streaming")
         .master("spark://spark-master:7077")
         .getOrCreate()
     )
@@ -53,24 +79,20 @@ def main():
 
     metrics_df = (
         parsed_df
-        .groupBy(
-            window(col("event_time"), "1 minute"),
-            col("event_type")
-        )
+        .groupBy(window(col("event_time"), "1 minute"), col("event_type"))
         .count()
         .select(
             col("window.start").alias("window_start"),
             col("window.end").alias("window_end"),
             col("event_type"),
-            col("count").alias("event_count")
+            col("count").alias("event_count"),
         )
     )
 
     query = (
         metrics_df.writeStream
-        .format("parquet")
         .outputMode("append")
-        .option("path", OUTPUT_PATH)
+        .foreachBatch(write_to_redis)
         .option("checkpointLocation", CHECKPOINT_PATH)
         .start()
     )
