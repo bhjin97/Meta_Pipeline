@@ -1,6 +1,7 @@
 import json
 import time
 from pathlib import Path
+from datetime import datetime
 
 from kafka import KafkaProducer
 
@@ -13,7 +14,7 @@ EVENT_SOURCES = {
     "review-events": Path("/app/origin_data_processing/data/event_source/review_events.jsonl"),
 }
 
-SEND_INTERVAL_SECONDS = 0.1
+SEND_INTERVAL_SECONDS = 0.05  # 조금 빠르게 조정
 
 
 def read_jsonl(file_path):
@@ -31,35 +32,30 @@ def read_jsonl(file_path):
 def create_producer():
     return KafkaProducer(
         bootstrap_servers=BOOTSTRAP_SERVERS,
-        key_serializer=lambda key: key.encode("utf-8"),
+        key_serializer=lambda key: key.encode("utf-8") if key else None,
         value_serializer=lambda value: json.dumps(value, ensure_ascii=False).encode("utf-8"),
     )
 
 
-def send_events(producer, topic, file_path):
-    print(f"\n[START] topic={topic}")
-    print(f"[FILE] {file_path}")
+def parse_event_time(event):
+    # event_time 문자열 → datetime 변환
+    return datetime.fromisoformat(event["event_time"])
 
-    count = 0
 
-    for event in read_jsonl(file_path):
-        key = event.get("order_id") or event.get("review_id") or event.get("event_id")
+def load_all_events():
+    all_events = []
 
-        producer.send(
-            topic=topic,
-            key=key,
-            value=event,
-        )
+    for topic, file_path in EVENT_SOURCES.items():
+        print(f"[LOAD] {topic} from {file_path}")
 
-        count += 1
+        for event in read_jsonl(file_path):
+            if "event_time" not in event:
+                continue
 
-        if count % 1000 == 0:
-            print(f"[{topic}] sent {count:,} events")
+            all_events.append((topic, event))
 
-        time.sleep(SEND_INTERVAL_SECONDS)
-
-    producer.flush()
-    print(f"[DONE] topic={topic}, total={count:,}")
+    print(f"[LOAD DONE] total events: {len(all_events):,}")
+    return all_events
 
 
 def main():
@@ -68,14 +64,42 @@ def main():
 
     producer = create_producer()
 
+    # 1. 모든 이벤트 로드
+    all_events = load_all_events()
+
+    # 2. event_time 기준 정렬 
+    print("[SORT] event_time 기준 정렬 중...")
+    all_events.sort(key=lambda x: parse_event_time(x[1]))
+
+    print("[SORT DONE]")
+
+    # 3. 전송
+    print("[START SENDING]")
+    count = 0
+
     try:
-        for topic, file_path in EVENT_SOURCES.items():
-            send_events(producer, topic, file_path)
-    finally:
+        for topic, event in all_events:
+            key = event.get("order_id") or event.get("review_id") or event.get("event_id")
+
+            producer.send(
+                topic=topic,
+                key=key,
+                value=event,
+            )
+
+            count += 1
+
+            if count % 1000 == 0:
+                print(f"[PROGRESS] sent {count:,} events")
+
+            time.sleep(SEND_INTERVAL_SECONDS)
+
         producer.flush()
+
+    finally:
         producer.close()
 
-    print("\n모든 이벤트 전송 완료")
+    print(f"[DONE] total sent: {count:,}")
 
 
 if __name__ == "__main__":
