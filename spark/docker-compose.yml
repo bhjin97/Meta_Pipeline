@@ -1,5 +1,6 @@
 services:
   spark-master:
+    build: .
     image: apache/spark:3.5.1
     container_name: spark-master
     command: >
@@ -7,6 +8,8 @@ services:
     ports:
       - "18080:8080"
       - "7077:7077"
+    environment:
+      - SPARK_SUBMIT_OPTS=-Divy.home=/opt/spark/.ivy2 -Divy.cache.dir=/opt/spark/.ivy2/cache      
     volumes:
       - ../:/app
       - spark-ivy:/opt/spark/.ivy2
@@ -16,6 +19,7 @@ services:
     mem_limit: 1g
 
   spark-worker:
+    build: .
     image: apache/spark:3.5.1
     container_name: spark-worker
     depends_on:
@@ -25,6 +29,7 @@ services:
     environment:
       - SPARK_WORKER_CORES=2
       - SPARK_WORKER_MEMORY=6G
+      - SPARK_SUBMIT_OPTS=-Divy.home=/opt/spark/.ivy2 -Divy.cache.dir=/opt/spark/.ivy2/cache
     volumes:
       - ../:/app
       - spark-ivy:/opt/spark/.ivy2
