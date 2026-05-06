@@ -7,16 +7,31 @@ from pyspark.sql.types import StructType, StructField, StringType
 
 
 KAFKA_BOOTSTRAP_SERVERS = "kafka:29092"
-TOPIC_NAME = "delivery-events"
-CHECKPOINT_PATH = "/app/data/checkpoints/delivery_metrics"
+TOPIC_NAME = "order-events"
 
+MINIO_OUTPUT_PATH = "s3a://ecommerce/bronze/events/order_events/"
+MINIO_CHECKPOINT_PATH = "s3a://ecommerce/checkpoints/events/order_events_raw/"
 
+REDIS_CHECKPOINT_PATH = "/app/data/checkpoints/order_metrics"
 REDIS_HOST = "redis"
 REDIS_PORT = 6379
-REDIS_KEY_PREFIX = "streaming:delivery"
+REDIS_KEY_PREFIX = "streaming:order"
 
 
-def write_to_redis(df, batch_id):
+def create_spark_session():
+    return (
+        SparkSession.builder
+        .appName("Order Events Streaming")
+        .config("spark.hadoop.fs.s3a.endpoint", "http://minio:9000")
+        .config("spark.hadoop.fs.s3a.access.key", "minioadmin")
+        .config("spark.hadoop.fs.s3a.secret.key", "minioadmin")
+        .config("spark.hadoop.fs.s3a.path.style.access", "true")
+        .config("spark.hadoop.fs.s3a.connection.ssl.enabled", "false")
+        .getOrCreate()
+    )
+
+
+def write_metrics_to_redis(df, batch_id):
     if df.isEmpty():
         return
 
@@ -37,13 +52,7 @@ def write_to_redis(df, batch_id):
 
 
 def main():
-    spark = (
-        SparkSession.builder
-        .appName("Order Event Metrics Streaming")
-        .master("spark://spark-master:7077")
-        .getOrCreate()
-    )
-
+    spark = create_spark_session()
     spark.sparkContext.setLogLevel("WARN")
 
     schema = StructType([
@@ -52,7 +61,7 @@ def main():
         StructField("event_time", StringType(), True),
         StructField("order_id", StringType(), True),
         StructField("customer_id", StringType(), True),
-        StructField("delivery_status", StringType(), True),
+        StructField("order_status", StringType(), True),
     ])
 
     kafka_df = (
@@ -77,6 +86,15 @@ def main():
         .dropDuplicates(["event_id"])
     )
 
+    raw_query = (
+        parsed_df.writeStream
+        .format("parquet")
+        .outputMode("append")
+        .option("path", MINIO_OUTPUT_PATH)
+        .option("checkpointLocation", MINIO_CHECKPOINT_PATH)
+        .start()
+    )
+
     metrics_df = (
         parsed_df
         .groupBy(window(col("event_time"), "1 minute"), col("event_type"))
@@ -89,15 +107,15 @@ def main():
         )
     )
 
-    query = (
+    metrics_query = (
         metrics_df.writeStream
-        .outputMode("append")
-        .foreachBatch(write_to_redis)
-        .option("checkpointLocation", CHECKPOINT_PATH)
+        .outputMode("update")
+        .foreachBatch(write_metrics_to_redis)
+        .option("checkpointLocation", REDIS_CHECKPOINT_PATH)
         .start()
     )
 
-    query.awaitTermination()
+    spark.streams.awaitAnyTermination()
 
 
 if __name__ == "__main__":
