@@ -1,0 +1,88 @@
+services:
+  airflow-postgres:
+    image: postgres:13
+    container_name: airflow-postgres
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+    volumes:
+      - airflow-postgres-data:/var/lib/postgresql/data
+    networks:
+      - data-pipeline-net
+
+  airflow-init:
+    build: .
+    container_name: airflow-init
+    depends_on:
+      - airflow-postgres
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-postgres:5432/airflow
+      # PATH 설정 (문법 수정)
+      PATH: "/home/airflow/.local/bin:/usr/local/bin:/usr/bin:/bin"
+      # DB 초기화 자동화 변수
+      _AIRFLOW_DB_MIGRATE: "true"
+      _AIRFLOW_WWW_USER_CREATE: "true"
+      _AIRFLOW_WWW_USER_USERNAME: "airflow"
+      _AIRFLOW_WWW_USER_PASSWORD: "airflow"
+      _AIRFLOW_WWW_USER_FIRSTNAME: "admin"
+      _AIRFLOW_WWW_USER_LASTNAME: "admin"
+      _AIRFLOW_WWW_USER_ROLE: "Admin"
+      _AIRFLOW_WWW_USER_EMAIL: "admin@test.com"
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ./logs:/opt/airflow/logs
+      - ./plugins:/opt/airflow/plugins
+    networks:
+      - data-pipeline-net
+    command: version
+
+  airflow-webserver:
+    build: .
+    container_name: airflow-webserver
+    depends_on:
+      airflow-init
+        condition: service_completed_successfully
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-postgres:5432/airflow
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      PATH: "/home/airflow/.local/bin:/usr/local/bin:/usr/bin:/bin"
+    ports:
+      - "8081:8080"
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ./logs:/opt/airflow/logs
+      - ./plugins:/opt/airflow/plugins
+      - ../:/app
+    networks:
+      - data-pipeline-net
+    command: bash -c "airflow webserver"
+
+  airflow-scheduler:
+    build: .
+    container_name: airflow-scheduler
+    depends_on:
+      airflow-init
+        condition: service_completed_successfully
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-postgres:5432/airflow
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      PATH: "/home/airflow/.local/bin:/usr/local/bin:/usr/bin:/bin"
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ./logs:/opt/airflow/logs
+      - ./plugins:/opt/airflow/plugins
+      - ../:/app
+    networks:
+      - data-pipeline-net
+    command: bash -c "airflow scheduler"
+
+networks:
+  data-pipeline-net:
+    external: true
+
+volumes:
+  airflow-postgres-data:
