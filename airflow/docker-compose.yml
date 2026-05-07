@@ -36,13 +36,14 @@ services:
       - ./plugins:/opt/airflow/plugins
     networks:
       - data-pipeline-net
-    command: version
+    command: >
+      bash -c "airflow db migrate && airflow users create --username airflow --password airflow --firstname admin --lastname admin --role Admin --email admin@test.com || true"
 
   airflow-webserver:
     build: .
     container_name: airflow-webserver
     depends_on:
-      airflow-init
+      airflow-init:
         condition: service_completed_successfully
     environment:
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
@@ -64,7 +65,7 @@ services:
     build: .
     container_name: airflow-scheduler
     depends_on:
-      airflow-init
+      airflow-init:
         condition: service_completed_successfully
     environment:
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
