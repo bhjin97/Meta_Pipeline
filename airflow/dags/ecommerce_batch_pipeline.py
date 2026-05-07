@@ -18,9 +18,9 @@ spark-submit \
 
 
 with DAG(
-    dag_id="ecommerce_batch_pipeline",
+    dag_id="ecommerce_batch_pipeline", 
     start_date=datetime(2026, 5, 7),
-    schedule=None,
+    schedule=None, 
     catchup=False,
     tags=["ecommerce", "spark", "batch"],
 ) as dag:
@@ -70,3 +70,5 @@ with DAG(
         build_fact_delivery,
         build_fact_review,
     ] >> check_silver_tables >> build_gold_marts
+
+# 태스크 그룹 추가
