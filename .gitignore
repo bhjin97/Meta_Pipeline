@@ -12,6 +12,7 @@ __pycache__/
 *.log
 origin_data_processing/data/raw/
 data/
+logs/
 
 # OS 관련 설정 파일
 .DS_Store
