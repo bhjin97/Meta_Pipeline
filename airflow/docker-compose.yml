@@ -57,6 +57,7 @@ services:
       - ./logs:/opt/airflow/logs
       - ./plugins:/opt/airflow/plugins
       - ../:/app
+      - airflow-ivy-cache:/home/airflow/.ivy2
     networks:
       - data-pipeline-net
     command: bash -c "airflow webserver"
@@ -77,6 +78,7 @@ services:
       - ./logs:/opt/airflow/logs
       - ./plugins:/opt/airflow/plugins
       - ../:/app
+      - airflow-ivy-cache:/home/airflow/.ivy2
     networks:
       - data-pipeline-net
     command: bash -c "airflow scheduler"
@@ -87,3 +89,4 @@ networks:
 
 volumes:
   airflow-postgres-data:
+  airflow-ivy-cache:
