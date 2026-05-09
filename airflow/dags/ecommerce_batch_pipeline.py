@@ -4,11 +4,10 @@ from airflow import DAG
 from airflow.providers.apache.spark.operators.spark_submit import SparkSubmitOperator
 from airflow.utils.task_group import TaskGroup
 
-
-SPARK_PACKAGES = (
-    "org.apache.hadoop:hadoop-aws:3.3.4,"
-    "com.amazonaws:aws-java-sdk-bundle:1.12.262,"
-    "org.postgresql:postgresql:42.7.3"
+COMMON_JARS = (
+    "/opt/airflow/jars/hadoop-aws-3.3.4.jar,"
+    "/opt/airflow/jars/aws-java-sdk-bundle-1.12.262.jar,"
+    "/opt/airflow/jars/postgresql-42.7.3.jar"
 )
 
 SPARK_CONF = {
@@ -32,7 +31,7 @@ def create_spark_task(task_id: str, script_name: str) -> SparkSubmitOperator:
         task_id=task_id,
         application=f"/app/spark/batch/{script_name}",
         conn_id="spark_default",
-        packages=SPARK_PACKAGES,
+        jars=COMMON_JARS,
         conf=SPARK_CONF,
         verbose=True,
     )
