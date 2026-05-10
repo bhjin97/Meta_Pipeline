@@ -27,3 +27,4 @@ RUN pip install --no-cache-dir \
     "apache-airflow==2.10.5" \
     "apache-airflow-providers-apache-spark" \
     "pyspark==3.5.1"
+    "psycopg2-binary"
