@@ -1,5 +1,5 @@
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import col, to_date, date_format
+from pyspark.sql.functions import col, to_date, date_format, date_format
 
 def create_spark_session():
     return (
@@ -7,11 +7,6 @@ def create_spark_session():
         .appName("Build Fact Order Item")
         .getOrCreate()
     )
-
-fact_order_item = fact_order_item.withColumn(
-    "order_month",
-    date_format(col("order_purchase_timestamp"), "yyyy-MM")
-)
 
 def main():
     spark = create_spark_session()
@@ -67,6 +62,11 @@ def main():
             col("payment_total_value"),
             to_date(col("event_time")).alias("order_event_date"),
         )
+    )
+
+    fact_order_item = fact_order_item.withColumn(
+    "order_month",
+    date_format(col("order_purchase_timestamp"), "yyyy-MM")
     )
 
     fact_order_item.write.mode("overwrite") \

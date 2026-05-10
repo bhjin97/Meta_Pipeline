@@ -1,5 +1,5 @@
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import col, to_date, to_timestamp, datediff, when
+from pyspark.sql.functions import col, to_date, to_timestamp, datediff, when, date_format
 
 
 def create_spark_session():
@@ -8,10 +8,6 @@ def create_spark_session():
         .appName("Build Fact Delivery")
         .getOrCreate()
     )
-fact_delivery = fact_delivery.withColumn(
-    "delivery_month",
-    date_format(col("delivery_event_date"), "yyyy-MM")
-)
 
 def main():
     spark = create_spark_session()
@@ -84,6 +80,11 @@ def main():
 
             to_date(col("event_time")).alias("delivery_event_date"),
         )
+    )
+
+    fact_delivery = fact_delivery.withColumn(
+    "delivery_month",
+    date_format(col("delivery_event_date"), "yyyy-MM")
     )
 
     fact_delivery.write.mode("overwrite") \

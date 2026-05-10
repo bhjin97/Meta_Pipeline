@@ -1,5 +1,5 @@
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import col, to_date, to_timestamp, datediff
+from pyspark.sql.functions import col, to_date, to_timestamp, datediff, date_format
 
 
 def create_spark_session():
@@ -9,10 +9,6 @@ def create_spark_session():
         .getOrCreate()
     )
 
-fact_review = fact_review.withColumn(
-    "review_month",
-    date_format(col("review_event_date"), "yyyy-MM")
-)
 
 def main():
     spark = create_spark_session()
@@ -64,6 +60,11 @@ def main():
             ).alias("review_answer_days"),
             to_date(col("event_time")).alias("review_event_date"),
         )
+    )
+
+    fact_review = fact_review.withColumn(
+    "review_month",
+    date_format(col("review_event_date"), "yyyy-MM")
     )
 
     fact_review.write.mode("overwrite") \
