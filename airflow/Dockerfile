@@ -26,5 +26,5 @@ RUN pip install --no-cache-dir \
     # Airflow 버전 명시적으로 고정
     "apache-airflow==2.10.5" \
     "apache-airflow-providers-apache-spark" \
-    "pyspark==3.5.1"
+    "pyspark==3.5.1"  \
     "psycopg2-binary"
