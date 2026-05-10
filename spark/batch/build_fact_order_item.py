@@ -66,7 +66,7 @@ def main():
 
     fact_order_item = fact_order_item.withColumn(
     "order_month",
-    date_format(col("order_purchase_timestamp"), "yyyy-MM")
+    date_format(col("order_event_date"), "yyyy-MM")
     )
 
     fact_order_item.write.mode("overwrite") \
