@@ -8,7 +8,10 @@ def create_spark_session():
         .appName("Build Fact Delivery")
         .getOrCreate()
     )
-
+fact_delivery = fact_delivery.withColumn(
+    "delivery_month",
+    date_format(col("delivery_event_date"), "yyyy-MM")
+)
 
 def main():
     spark = create_spark_session()
@@ -83,7 +86,9 @@ def main():
         )
     )
 
-    fact_delivery.write.mode("overwrite").parquet(output_path)
+    fact_delivery.write.mode("overwrite") \
+        .partitionBy("delivery_month") \
+        .parquet(output_path)
 
     print("fact_delivery build completed")
     print(f"row count: {fact_delivery.count()}")

@@ -9,6 +9,10 @@ def create_spark_session():
         .getOrCreate()
     )
 
+fact_review = fact_review.withColumn(
+    "review_month",
+    date_format(col("review_event_date"), "yyyy-MM")
+)
 
 def main():
     spark = create_spark_session()
@@ -62,7 +66,9 @@ def main():
         )
     )
 
-    fact_review.write.mode("overwrite").parquet(output_path)
+    fact_review.write.mode("overwrite") \
+        .partitionBy("review_month") \
+        .parquet(output_path)
 
     print("fact_review build completed")
     print(f"row count: {fact_review.count()}")

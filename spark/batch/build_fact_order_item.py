@@ -1,6 +1,5 @@
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import col, to_date
-
+from pyspark.sql.functions import col, to_date, date_format
 
 def create_spark_session():
     return (
@@ -9,6 +8,10 @@ def create_spark_session():
         .getOrCreate()
     )
 
+fact_order_item = fact_order_item.withColumn(
+    "order_month",
+    date_format(col("order_purchase_timestamp"), "yyyy-MM")
+)
 
 def main():
     spark = create_spark_session()
@@ -66,7 +69,9 @@ def main():
         )
     )
 
-    fact_order_item.write.mode("overwrite").parquet(output_path)
+    fact_order_item.write.mode("overwrite") \
+        .partitionBy("order_month") \
+        .parquet(output_path)
 
     print("fact_order_item build completed")
     print(f"row count: {fact_order_item.count()}")
