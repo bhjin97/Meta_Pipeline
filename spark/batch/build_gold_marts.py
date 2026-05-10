@@ -1,4 +1,5 @@
 import psycopg2
+
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import (
     col,
@@ -8,6 +9,7 @@ from pyspark.sql.functions import (
     avg,
     round,
     when,
+    date_format,
     DataFrame,
 )
 
@@ -18,6 +20,7 @@ def create_spark_session():
         .appName("Build Gold Marts")
         .getOrCreate()
     )
+
 
 POSTGRES_HOST = "postgres"
 POSTGRES_PORT = 5432
@@ -35,6 +38,7 @@ POSTGRES_PROPERTIES = {
     "driver": "org.postgresql.Driver",
 }
 
+
 def write_to_postgres(df: DataFrame, table_name: str):
     (
         df.write
@@ -45,6 +49,7 @@ def write_to_postgres(df: DataFrame, table_name: str):
             properties=POSTGRES_PROPERTIES,
         )
     )
+
 
 def create_postgres_indexes():
     conn = psycopg2.connect(
@@ -89,18 +94,17 @@ def create_postgres_indexes():
 
     print("postgres indexes created")
 
+
 def main():
     spark = create_spark_session()
     spark.sparkContext.setLogLevel("WARN")
 
-    # Silver paths
     fact_order_item_path = "s3a://ecommerce/silver/fact_order_item/"
     fact_delivery_path = "s3a://ecommerce/silver/fact_delivery/"
     fact_review_path = "s3a://ecommerce/silver/fact_review/"
     dim_product_path = "s3a://ecommerce/silver/dim_product/"
     dim_customer_path = "s3a://ecommerce/silver/dim_customer/"
 
-    # Gold output paths
     daily_sales_output = "s3a://ecommerce/gold/mart_daily_sales/"
     category_sales_output = "s3a://ecommerce/gold/mart_category_sales/"
     customer_segment_output = "s3a://ecommerce/gold/mart_customer_segment_sales/"
@@ -129,16 +133,18 @@ def main():
             "avg_order_amount",
             round(col("total_sales_amount") / col("order_count"), 2)
         )
+        .withColumn(
+            "order_month",
+            date_format(col("order_event_date"), "yyyy-MM")
+        )
         .orderBy("order_event_date")
     )
 
-    mart_daily_sales.write.mode("overwrite").parquet(daily_sales_output)
-    
-    write_to_postgres(
-        mart_daily_sales,
-        "mart_daily_sales"
-    )
-    
+    mart_daily_sales.write.mode("overwrite") \
+        .partitionBy("order_month") \
+        .parquet(daily_sales_output)
+
+    write_to_postgres(mart_daily_sales, "mart_daily_sales")
 
     # 2. Category Sales Mart
     mart_category_sales = (
@@ -158,10 +164,7 @@ def main():
 
     mart_category_sales.write.mode("overwrite").parquet(category_sales_output)
 
-    write_to_postgres(
-        mart_category_sales,
-        "mart_category_sales"
-    )
+    write_to_postgres(mart_category_sales, "mart_category_sales")
 
     # 3. Customer Segment Sales Mart
     mart_customer_segment_sales = (
@@ -183,7 +186,9 @@ def main():
         .orderBy(col("total_sales_amount").desc())
     )
 
-    mart_customer_segment_sales.write.mode("overwrite").parquet(customer_segment_output)
+    mart_customer_segment_sales.write.mode("overwrite").parquet(
+        customer_segment_output
+    )
 
     write_to_postgres(
         mart_customer_segment_sales,
@@ -209,15 +214,18 @@ def main():
             "delay_rate",
             round(col("delayed_delivery_count") / col("delivery_event_count"), 4)
         )
+        .withColumn(
+            "delivery_month",
+            date_format(col("delivery_event_date"), "yyyy-MM")
+        )
         .orderBy("delivery_event_date")
     )
 
-    mart_delivery_kpi.write.mode("overwrite").parquet(delivery_kpi_output)
+    mart_delivery_kpi.write.mode("overwrite") \
+        .partitionBy("delivery_month") \
+        .parquet(delivery_kpi_output)
 
-    write_to_postgres(
-        mart_delivery_kpi,
-        "mart_delivery_kpi"
-    )
+    write_to_postgres(mart_delivery_kpi, "mart_delivery_kpi")
 
     # 5. Review KPI Mart
     mart_review_kpi = (
@@ -233,15 +241,18 @@ def main():
             _sum(when(col("review_score") == 5, 1).otherwise(0)).alias("score_5_count"),
             round(avg("review_answer_days"), 2).alias("avg_review_answer_days"),
         )
+        .withColumn(
+            "review_month",
+            date_format(col("review_event_date"), "yyyy-MM")
+        )
         .orderBy("review_event_date")
     )
 
-    mart_review_kpi.write.mode("overwrite").parquet(review_kpi_output)
+    mart_review_kpi.write.mode("overwrite") \
+        .partitionBy("review_month") \
+        .parquet(review_kpi_output)
 
-    write_to_postgres(
-        mart_review_kpi,
-        "mart_review_kpi"
-    )
+    write_to_postgres(mart_review_kpi, "mart_review_kpi")
 
     create_postgres_indexes()
 
