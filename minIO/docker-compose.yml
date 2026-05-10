@@ -13,6 +13,8 @@ services:
       - minio-data:/data
     networks:
       - data-pipeline-net
+    cpus: 0.25
+    mem_limit: 768m
 
 volumes:
   minio-data:

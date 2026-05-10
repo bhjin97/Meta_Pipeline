@@ -9,14 +9,14 @@ services:
       - "18080:8080"
       - "7077:7077"
     environment:
-      - SPARK_SUBMIT_OPTS=-Divy.home=/opt/spark/.ivy2 -Divy.cache.dir=/opt/spark/.ivy2/cache      
+      - SPARK_SUBMIT_OPTS=-Divy.home=/opt/spark/.ivy2 -Divy.cache.dir=/opt/spark/.ivy2/cache
     volumes:
       - ../:/app
       - spark-ivy:/opt/spark/.ivy2
     networks:
       - data-pipeline-net
-    cpus: 0.5
-    mem_limit: 1g
+    cpus: 0.25
+    mem_limit: 512m
 
   spark-worker:
     build: .
@@ -35,7 +35,7 @@ services:
       - spark-ivy:/opt/spark/.ivy2
     networks:
       - data-pipeline-net
-    cpus: 2.0
+    cpus: 1.75
     mem_limit: 7g
 
   redis:
@@ -70,8 +70,41 @@ services:
       - postgres-data:/var/lib/postgresql/data
     networks:
       - data-pipeline-net
-    cpus: 0.5
-    mem_limit: 1g
+    cpus: 0.75
+    mem_limit: 2g
+
+  metabase:
+    image: metabase/metabase:latest
+    container_name: metabase
+    depends_on:
+      - postgres
+    ports:
+      - "3000:3000"
+    networks:
+      - data-pipeline-net
+    volumes:
+      - metabase-data:/metabase-data
+    environment:
+      MB_DB_FILE: /metabase-data/metabase.db
+      JAVA_TOOL_OPTIONS: "-Xms512m -Xmx1G"
+    cpus: 0.75
+    mem_limit: 1536m
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    depends_on:
+      - redis
+    ports:
+      - "3001:3000"
+    environment:
+      GF_INSTALL_PLUGINS: redis-datasource
+    networks:
+      - data-pipeline-net
+    volumes:
+      - grafana-data:/var/lib/grafana
+    cpus: 0.25
+    mem_limit: 512m
 
 networks:
   data-pipeline-net:
@@ -81,3 +114,5 @@ volumes:
   spark-ivy:
   redis-data:
   postgres-data:
+  metabase-data:
+  grafana-data:

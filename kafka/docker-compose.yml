@@ -12,6 +12,8 @@ services:
       - zookeeper_log:/var/lib/zookeeper/log
     ports:
       - "2181:2181"
+    cpus: 0.25
+    mem_limit: 512m
 
   kafka:
     image: confluentinc/cp-kafka:7.3.2
@@ -33,6 +35,9 @@ services:
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
 
+      # Kafka JVM 메모리 제한
+      KAFKA_HEAP_OPTS: "-Xms1G -Xmx1536M"
+
       # 단일 브로커 환경 필수 설정
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
@@ -41,6 +46,8 @@ services:
 
       # 개발 환경 편의 설정
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+    cpus: 1.0
+    mem_limit: 2g
 
   kafka-ui:
     image: provectuslabs/kafka-ui:latest
@@ -56,6 +63,8 @@ services:
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
       KAFKA_CLUSTERS_0_ZOOKEEPER: zookeeper:2181
       DYNAMIC_CONFIG_ENABLED: "true"
+    cpus: 0.25
+    mem_limit: 384m
 
   producer:
     build: ./producer
@@ -68,6 +77,8 @@ services:
       - ..:/app
     working_dir: /app
     command: ["python", "kafka/producer/producer.py"]
+    cpus: 0.25
+    mem_limit: 256m
 
   consumer:
     build: ./consumer
@@ -80,6 +91,8 @@ services:
       - ..:/app
     working_dir: /app
     command: ["python", "kafka/consumer/consumer.py"]
+    cpus: 0.25
+    mem_limit: 256m
 
 networks:
   data-pipeline-net:
