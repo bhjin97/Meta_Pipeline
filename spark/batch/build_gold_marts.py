@@ -1,3 +1,4 @@
+import psycopg2
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import (
     col,
@@ -18,11 +19,19 @@ def create_spark_session():
         .getOrCreate()
     )
 
-POSTGRES_URL = "jdbc:postgresql://postgres:5432/ecommerce"
+POSTGRES_HOST = "postgres"
+POSTGRES_PORT = 5432
+POSTGRES_DB = "ecommerce"
+POSTGRES_USER = "postgres"
+POSTGRES_PASSWORD = "postgres"
+
+POSTGRES_URL = (
+    f"jdbc:postgresql://{POSTGRES_HOST}:{POSTGRES_PORT}/{POSTGRES_DB}"
+)
 
 POSTGRES_PROPERTIES = {
-    "user": "postgres",
-    "password": "postgres",
+    "user": POSTGRES_USER,
+    "password": POSTGRES_PASSWORD,
     "driver": "org.postgresql.Driver",
 }
 
@@ -36,6 +45,49 @@ def write_to_postgres(df: DataFrame, table_name: str):
             properties=POSTGRES_PROPERTIES,
         )
     )
+
+def create_postgres_indexes():
+    conn = psycopg2.connect(
+        host=POSTGRES_HOST,
+        port=POSTGRES_PORT,
+        database=POSTGRES_DB,
+        user=POSTGRES_USER,
+        password=POSTGRES_PASSWORD,
+    )
+
+    cur = conn.cursor()
+
+    index_sqls = [
+        """
+        CREATE INDEX IF NOT EXISTS idx_mart_daily_sales_order_event_date
+        ON mart_daily_sales (order_event_date);
+        """,
+        """
+        CREATE INDEX IF NOT EXISTS idx_mart_category_sales_category
+        ON mart_category_sales (product_category_name_english);
+        """,
+        """
+        CREATE INDEX IF NOT EXISTS idx_mart_customer_segment_age_sex_occupation
+        ON mart_customer_segment_sales (age_group, sex, occupation);
+        """,
+        """
+        CREATE INDEX IF NOT EXISTS idx_mart_delivery_kpi_delivery_event_date
+        ON mart_delivery_kpi (delivery_event_date);
+        """,
+        """
+        CREATE INDEX IF NOT EXISTS idx_mart_review_kpi_review_event_date
+        ON mart_review_kpi (review_event_date);
+        """,
+    ]
+
+    for sql in index_sqls:
+        cur.execute(sql)
+
+    conn.commit()
+    cur.close()
+    conn.close()
+
+    print("postgres indexes created")
 
 def main():
     spark = create_spark_session()
@@ -190,6 +242,8 @@ def main():
         mart_review_kpi,
         "mart_review_kpi"
     )
+
+    create_postgres_indexes()
 
     print("gold marts build completed")
     print(f"mart_daily_sales rows: {mart_daily_sales.count()}")
