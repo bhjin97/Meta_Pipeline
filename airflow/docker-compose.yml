@@ -52,6 +52,8 @@ services:
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-postgres:5432/airflow
       AIRFLOW__CORE__LOAD_EXAMPLES: "false"
       PATH: "/home/airflow/.local/bin:/usr/local/bin:/usr/bin:/bin"
+      AIRFLOW__CORE__PARALLELISM: "1"
+      AIRFLOW__CORE__MAX_ACTIVE_TASKS_PER_DAG: "1"
     ports:
       - "8081:8080"
     volumes:
@@ -77,6 +79,8 @@ services:
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-postgres:5432/airflow
       AIRFLOW__CORE__LOAD_EXAMPLES: "false"
       PATH: "/home/airflow/.local/bin:/usr/local/bin:/usr/bin:/bin"
+      AIRFLOW__CORE__PARALLELISM: "1"
+      AIRFLOW__CORE__MAX_ACTIVE_TASKS_PER_DAG: "1"
     volumes:
       - ./dags:/opt/airflow/dags
       - ./logs:/opt/airflow/logs
@@ -87,7 +91,7 @@ services:
       - data-pipeline-net
     command: bash -c "airflow scheduler"
     cpus: 0.5
-    mem_limit: 1g
+    mem_limit: 2g
 
 networks:
   data-pipeline-net:
