@@ -68,7 +68,7 @@ default_args = {
 }
 
 
-def create_spark_task(task_id: str, script_name: str) -> SparkSubmitOperator:
+def create_spark_task(task_id: str, script_name: str, on_success_callback=None) -> SparkSubmitOperator:
     return SparkSubmitOperator(
         task_id=task_id,
         application=f"/app/spark/batch/{script_name}",
