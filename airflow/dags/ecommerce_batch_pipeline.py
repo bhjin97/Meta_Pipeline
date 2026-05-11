@@ -13,10 +13,14 @@ COMMON_JARS = (
     "/opt/airflow/jars/postgresql-42.7.3.jar"
 )
 
+MINIO_ENDPOINT = os.getenv("MINIO_ENDPOINT")
+MINIO_ACCESS_KEY = os.getenv("MINIO_ACCESS_KEY")
+MINIO_SECRET_KEY = os.getenv("MINIO_SECRET_KEY")
+
 SPARK_CONF = {
-    "spark.hadoop.fs.s3a.endpoint": "http://minio:9000",
-    "spark.hadoop.fs.s3a.access.key": "minioadmin",
-    "spark.hadoop.fs.s3a.secret.key": "minioadmin",
+    "spark.hadoop.fs.s3a.endpoint": MINIO_ENDPOINT,
+    "spark.hadoop.fs.s3a.access.key": MINIO_ACCESS_KEY,
+    "spark.hadoop.fs.s3a.secret.key": MINIO_SECRET_KEY,
     "spark.hadoop.fs.s3a.path.style.access": "true",
     "spark.hadoop.fs.s3a.connection.ssl.enabled": "false",
 }
