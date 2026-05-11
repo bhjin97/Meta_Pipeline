@@ -186,3 +186,28 @@ Kafka Topics:
 ### Development / Utility
 ![Faker](https://img.shields.io/badge/Faker-3DDC84?style=for-the-badge&logo=python&logoColor=white)
 ![Kafka UI](https://img.shields.io/badge/Kafka%20UI-2C2C2C?style=for-the-badge&logo=apachekafka&logoColor=white)
+
+## ⚙️ Resource Allocation
+
+현재 Oracle Cloud VM (4 vCPU / 24GB RAM) 환경 기준으로  
+Streaming / Batch / BI 서비스를 안정적으로 운영하기 위해 리소스를 분배
+
+| Service | CPU | Memory |
+|---|---:|---:|
+| MinIO | 0.25 Core | 768MB |
+| Zookeeper | 0.25 Core | 512MB |
+| Kafka | 1.0 Core | 2GB |
+| Kafka UI | 0.25 Core | 256MB |
+| Producer | 0.25 Core | 256MB |
+| Consumer | 0.25 Core | 256MB |
+| Spark Master | 0.25 Core | 512MB |
+| Spark Worker | 1.75 Core | 6GB |
+| Airflow Webserver | 0.5 Core | 1GB |
+| Airflow Scheduler | 0.5 Core | 1GB |
+| Airflow Postgres | 0.25 Core | 512MB |
+| Main Postgres | 0.75 Core | 2GB |
+| Redis | 0.5 Core | 768MB |
+| Metabase | 0.75 Core | 1.5GB |
+| Grafana | 0.25 Core | 512MB |
+
+---
