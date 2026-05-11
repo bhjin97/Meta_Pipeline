@@ -54,6 +54,7 @@ services:
       PATH: "/home/airflow/.local/bin:/usr/local/bin:/usr/bin:/bin"
       AIRFLOW__CORE__PARALLELISM: "1"
       AIRFLOW__CORE__MAX_ACTIVE_TASKS_PER_DAG: "1"
+      SLACK_WEBHOOK_URL: ${SLACK_WEBHOOK_URL}
     ports:
       - "8081:8080"
     volumes:
@@ -81,6 +82,7 @@ services:
       PATH: "/home/airflow/.local/bin:/usr/local/bin:/usr/bin:/bin"
       AIRFLOW__CORE__PARALLELISM: "1"
       AIRFLOW__CORE__MAX_ACTIVE_TASKS_PER_DAG: "1"
+      SLACK_WEBHOOK_URL: ${SLACK_WEBHOOK_URL}
     volumes:
       - ./dags:/opt/airflow/dags
       - ./logs:/opt/airflow/logs
