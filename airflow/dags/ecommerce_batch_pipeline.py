@@ -1,4 +1,7 @@
 from datetime import datetime, timedelta
+import os
+import json
+import requests
 
 from airflow import DAG
 from airflow.providers.apache.spark.operators.spark_submit import SparkSubmitOperator
@@ -18,11 +21,50 @@ SPARK_CONF = {
     "spark.hadoop.fs.s3a.connection.ssl.enabled": "false",
 }
 
+def send_slack_alert(context, status):
+    webhook_url = os.getenv("SLACK_WEBHOOK_URL")
+
+    if not webhook_url:
+        print("SLACK_WEBHOOK_URL is not set.")
+        return
+
+    dag_id = context.get("dag").dag_id
+    task_id = context.get("task_instance").task_id
+    execution_date = context.get("execution_date")
+    log_url = context.get("task_instance").log_url
+
+    if status == "success":
+        emoji = "✅"
+        title = "Airflow Task Success"
+    else:
+        emoji = "🚨"
+        title = "Airflow Task Failed"
+
+    message = {
+        "text": (
+            f"{emoji} *{title}*\n"
+            f"*DAG*: `{dag_id}`\n"
+            f"*Task*: `{task_id}`\n"
+            f"*Execution Date*: `{execution_date}`\n"
+            f"*Log*: {log_url}"
+        )
+    }
+
+    response = requests.post(
+        webhook_url,
+        data=json.dumps(message),
+        headers={"Content-Type": "application/json"},
+        timeout=5
+    )
+
+    print(response.text)
+
 default_args = {
     "owner": "airflow",
     "retries": 2,
     "retry_delay": timedelta(minutes=5),
     "execution_timeout": timedelta(minutes=30),
+    "on_failure_callback": lambda context: send_slack_alert(context, "failed"),
 }
 
 
@@ -34,6 +76,7 @@ def create_spark_task(task_id: str, script_name: str) -> SparkSubmitOperator:
         jars=COMMON_JARS,
         conf=SPARK_CONF,
         verbose=True,
+        on_success_callback=on_success_callback,
     )
 
 
@@ -73,6 +116,7 @@ with DAG(
         build_gold_marts = create_spark_task(
             task_id="build_gold_marts",
             script_name="build_gold_marts.py",
+            on_success_callback=lambda context: send_slack_alert(context, "success"),
         )
 
     silver_layer >> validation_layer >> gold_layer
