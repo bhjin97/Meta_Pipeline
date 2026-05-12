@@ -23,6 +23,7 @@ MINIO_CHECKPOINT_PATH = "s3a://ecommerce/checkpoints/events/delivery_events_raw/
 
 REDIS_CHECKPOINT_PATH = "/app/data/checkpoints/delivery_metrics"
 REDIS_KEY_PREFIX = "streaming:delivery"
+TIMESERIES_TTL_SECONDS = 60 * 60 * 24
 
 
 def create_spark_session():
@@ -46,27 +47,34 @@ def write_metrics_to_redis(df, batch_id):
     r = redis.Redis(
         host=REDIS_HOST,
         port=REDIS_PORT,
-        decode_responses=True
+        decode_responses=True,
     )
 
     for row in df.collect():
         event_type = row["event_type"]
         window_start = str(row["window_start"])
         window_end = str(row["window_end"])
+        event_count = int(row["event_count"])
 
         value = {
             "window_start": window_start,
             "window_end": window_end,
             "event_type": event_type,
-            "event_count": row["event_count"],
+            "event_count": event_count,
             "batch_id": batch_id,
         }
 
         latest_key = f"{REDIS_KEY_PREFIX}:latest:{event_type}"
         timeseries_key = f"{REDIS_KEY_PREFIX}:timeseries:{event_type}:{window_start}"
+        total_key = f"{REDIS_KEY_PREFIX}:total:{event_type}"
 
         r.set(latest_key, json.dumps(value, ensure_ascii=False))
-        r.set(timeseries_key, json.dumps(value, ensure_ascii=False))
+        r.setex(
+            timeseries_key,
+            TIMESERIES_TTL_SECONDS,
+            json.dumps(value, ensure_ascii=False),
+        )
+        r.incrby(total_key, event_count)
 
     print(f"[BATCH {batch_id}] delivery metrics saved to Redis")
 
