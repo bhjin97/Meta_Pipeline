@@ -3,6 +3,8 @@ services:
     build: .
     image: apache/spark:3.5.1
     container_name: spark-master
+    env_file:
+      - .env
     command: >
       /opt/spark/bin/spark-class org.apache.spark.deploy.master.Master
     ports:
@@ -15,13 +17,15 @@ services:
       - spark-ivy:/opt/spark/.ivy2
     networks:
       - data-pipeline-net
-    cpus: 0.25
-    mem_limit: 512m
+    cpus: 0.5
+    mem_limit: 2g
 
   spark-worker:
     build: .
     image: apache/spark:3.5.1
     container_name: spark-worker
+    env_file:
+      - .env    
     depends_on:
       - spark-master
     command: >
