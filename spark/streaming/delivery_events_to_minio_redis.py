@@ -1,3 +1,4 @@
+import os
 import json
 import redis
 
@@ -6,15 +7,21 @@ from pyspark.sql.functions import col, from_json, to_timestamp, window
 from pyspark.sql.types import StructType, StructField, StringType
 
 
-KAFKA_BOOTSTRAP_SERVERS = "kafka:29092"
+KAFKA_BOOTSTRAP_SERVERS = os.environ["KAFKA_BOOTSTRAP_SERVERS"]
+
+MINIO_ENDPOINT = os.environ["MINIO_ENDPOINT"]
+MINIO_ACCESS_KEY = os.environ["MINIO_ACCESS_KEY"]
+MINIO_SECRET_KEY = os.environ["MINIO_SECRET_KEY"]
+
+REDIS_HOST = os.environ["REDIS_HOST"]
+REDIS_PORT = int(os.environ["REDIS_PORT"])
+
 TOPIC_NAME = "delivery-events"
 
 MINIO_OUTPUT_PATH = "s3a://ecommerce/bronze/events/delivery_events/"
 MINIO_CHECKPOINT_PATH = "s3a://ecommerce/checkpoints/events/delivery_events_raw/"
 
 REDIS_CHECKPOINT_PATH = "/app/data/checkpoints/delivery_metrics"
-REDIS_HOST = "redis"
-REDIS_PORT = 6379
 REDIS_KEY_PREFIX = "streaming:delivery"
 
 
@@ -23,9 +30,9 @@ def create_spark_session():
         SparkSession.builder
         .appName("Delivery Events Streaming")
         .master("spark://spark-master:7077")
-        .config("spark.hadoop.fs.s3a.endpoint", "http://minio:9000")
-        .config("spark.hadoop.fs.s3a.access.key", "minioadmin")
-        .config("spark.hadoop.fs.s3a.secret.key", "minioadmin")
+        .config("spark.hadoop.fs.s3a.endpoint", MINIO_ENDPOINT)
+        .config("spark.hadoop.fs.s3a.access.key", MINIO_ACCESS_KEY)
+        .config("spark.hadoop.fs.s3a.secret.key", MINIO_SECRET_KEY)
         .config("spark.hadoop.fs.s3a.path.style.access", "true")
         .config("spark.hadoop.fs.s3a.connection.ssl.enabled", "false")
         .getOrCreate()
@@ -36,18 +43,30 @@ def write_metrics_to_redis(df, batch_id):
     if df.isEmpty():
         return
 
-    r = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, decode_responses=True)
+    r = redis.Redis(
+        host=REDIS_HOST,
+        port=REDIS_PORT,
+        decode_responses=True
+    )
 
     for row in df.collect():
-        key = f"{REDIS_KEY_PREFIX}:{row['event_type']}"
+        event_type = row["event_type"]
+        window_start = str(row["window_start"])
+        window_end = str(row["window_end"])
+
         value = {
-            "window_start": str(row["window_start"]),
-            "window_end": str(row["window_end"]),
-            "event_type": row["event_type"],
+            "window_start": window_start,
+            "window_end": window_end,
+            "event_type": event_type,
             "event_count": row["event_count"],
             "batch_id": batch_id,
         }
-        r.set(key, json.dumps(value, ensure_ascii=False))
+
+        latest_key = f"{REDIS_KEY_PREFIX}:latest:{event_type}"
+        timeseries_key = f"{REDIS_KEY_PREFIX}:timeseries:{event_type}:{window_start}"
+
+        r.set(latest_key, json.dumps(value, ensure_ascii=False))
+        r.set(timeseries_key, json.dumps(value, ensure_ascii=False))
 
     print(f"[BATCH {batch_id}] delivery metrics saved to Redis")
 
