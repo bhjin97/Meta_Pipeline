@@ -1,5 +1,6 @@
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import col, to_date, to_timestamp, datediff, date_format
+from pyspark.sql.functions import col, to_date, date_format
+
 
 def create_spark_session():
     return (
@@ -7,6 +8,7 @@ def create_spark_session():
         .appName("Build Fact Order Item")
         .getOrCreate()
     )
+
 
 def main():
     spark = create_spark_session()
@@ -20,6 +22,12 @@ def main():
     order_events_df = spark.read.parquet(order_events_path)
     order_items_df = spark.read.parquet(order_items_path)
     payments_df = spark.read.parquet(payments_path)
+
+    processed_order_item_df = (
+        spark.read.parquet(output_path)
+        .select("order_id", "order_item_id", "event_type")
+        .dropDuplicates(["order_id", "order_item_id", "event_type"])
+    )
 
     latest_order_events = (
         order_events_df
@@ -62,19 +70,32 @@ def main():
             col("payment_total_value"),
             to_date(col("event_time")).alias("order_event_date"),
         )
+        .dropDuplicates(["order_id", "order_item_id", "event_type"])
+        .join(
+            processed_order_item_df,
+            on=["order_id", "order_item_id", "event_type"],
+            how="left_anti"
+        )
     )
+
+    if fact_order_item.rdd.isEmpty():
+        print("No new order item events to process")
+        spark.stop()
+        return
 
     fact_order_item = fact_order_item.withColumn(
-    "order_month",
-    date_format(col("order_event_date"), "yyyy-MM")
+        "order_month",
+        date_format(col("order_event_date"), "yyyy-MM")
     )
 
-    fact_order_item.write.mode("overwrite") \
+    new_count = fact_order_item.count()
+
+    fact_order_item.write.mode("append") \
         .partitionBy("order_month") \
         .parquet(output_path)
 
-    print("fact_order_item build completed")
-    print(f"row count: {fact_order_item.count()}")
+    print("fact_order_item incremental build completed")
+    print(f"new row count: {new_count}")
 
     spark.stop()
 

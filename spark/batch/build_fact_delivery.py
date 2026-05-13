@@ -9,6 +9,7 @@ def create_spark_session():
         .getOrCreate()
     )
 
+
 def main():
     spark = create_spark_session()
     spark.sparkContext.setLogLevel("WARN")
@@ -20,6 +21,12 @@ def main():
     delivery_events_df = spark.read.parquet(delivery_events_path)
     orders_df = spark.read.parquet(orders_path)
 
+    processed_delivery_df = (
+        spark.read.parquet(output_path)
+        .select("order_id", "event_type")
+        .dropDuplicates(["order_id", "event_type"])
+    )
+
     delivery_events_df = (
         delivery_events_df
         .select(
@@ -30,7 +37,17 @@ def main():
             col("delivery_status"),
         )
         .dropDuplicates(["order_id", "event_type"])
+        .join(
+            processed_delivery_df,
+            on=["order_id", "event_type"],
+            how="left_anti"
+        )
     )
+
+    if delivery_events_df.rdd.isEmpty():
+        print("No new delivery events to process")
+        spark.stop()
+        return
 
     orders_df = (
         orders_df
@@ -83,16 +100,18 @@ def main():
     )
 
     fact_delivery = fact_delivery.withColumn(
-    "delivery_month",
-    date_format(col("delivery_event_date"), "yyyy-MM")
+        "delivery_month",
+        date_format(col("delivery_event_date"), "yyyy-MM")
     )
 
-    fact_delivery.write.mode("overwrite") \
+    new_count = fact_delivery.count()
+
+    fact_delivery.write.mode("append") \
         .partitionBy("delivery_month") \
         .parquet(output_path)
 
-    print("fact_delivery build completed")
-    print(f"row count: {fact_delivery.count()}")
+    print("fact_delivery incremental build completed")
+    print(f"new row count: {new_count}")
 
     spark.stop()
 

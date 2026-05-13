@@ -21,6 +21,12 @@ def main():
     review_events_df = spark.read.parquet(review_events_path)
     reviews_df = spark.read.parquet(reviews_path)
 
+    processed_review_df = (
+        spark.read.parquet(output_path)
+        .select("review_id", "event_type")
+        .dropDuplicates(["review_id", "event_type"])
+    )
+
     review_events_df = (
         review_events_df
         .select(
@@ -32,7 +38,17 @@ def main():
             col("review_score").cast("int").alias("review_score"),
         )
         .dropDuplicates(["review_id", "event_type"])
+        .join(
+            processed_review_df,
+            on=["review_id", "event_type"],
+            how="left_anti"
+        )
     )
+
+    if review_events_df.rdd.isEmpty():
+        print("No new review events to process")
+        spark.stop()
+        return
 
     reviews_df = (
         reviews_df
@@ -63,16 +79,18 @@ def main():
     )
 
     fact_review = fact_review.withColumn(
-    "review_month",
-    date_format(col("review_event_date"), "yyyy-MM")
+        "review_month",
+        date_format(col("review_event_date"), "yyyy-MM")
     )
 
-    fact_review.write.mode("overwrite") \
+    new_count = fact_review.count()
+
+    fact_review.write.mode("append") \
         .partitionBy("review_month") \
         .parquet(output_path)
 
-    print("fact_review build completed")
-    print(f"row count: {fact_review.count()}")
+    print("fact_review incremental build completed")
+    print(f"new row count: {new_count}")
 
     spark.stop()
 
