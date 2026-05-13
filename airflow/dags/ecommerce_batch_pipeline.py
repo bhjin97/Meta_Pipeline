@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+import pendulum
 import os
 import json
 import requests
@@ -24,6 +25,8 @@ SPARK_CONF = {
     "spark.hadoop.fs.s3a.path.style.access": "true",
     "spark.hadoop.fs.s3a.connection.ssl.enabled": "false",
 }
+
+KST = pendulum.timezone("Asia/Seoul")
 
 def send_slack_alert(context, status):
     webhook_url = os.getenv("SLACK_WEBHOOK_URL")
@@ -87,8 +90,8 @@ def create_spark_task(task_id: str, script_name: str, on_success_callback=None) 
 with DAG(
     dag_id="ecommerce_batch_pipeline",
     default_args=default_args,
-    start_date=datetime(2026, 5, 7),
-    schedule=None,
+    start_date=datetime(2026, 5, 7, tzinfo=KST),
+    schedule="0 3 * * *",
     catchup=False,
     max_active_runs=1,
     tags=["ecommerce", "spark", "batch"],
