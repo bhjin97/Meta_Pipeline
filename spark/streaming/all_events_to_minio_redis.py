@@ -131,8 +131,8 @@ def build_topic_stream(kafka_df, topic_name, config):
         .filter(col("event_id").isNotNull())
         .filter(col("event_time").isNotNull())
         .filter(col("event_type").isNotNull())
-        .withWatermark("event_time", "2 minutes")
-        .dropDuplicates(["event_id"])
+        #.withWatermark("event_time", "2 minutes")
+        #.dropDuplicates(["event_id"])
     )
 
     raw_query = (

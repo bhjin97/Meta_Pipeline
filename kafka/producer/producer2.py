@@ -53,65 +53,49 @@ def create_producer():
     )
 
 
-def parse_event_time(event):
-    return datetime.fromisoformat(event["event_time"])
-
-
-def load_all_events():
-    all_events = []
-
-    for topic, file_path in EVENT_SOURCES.items():
-        print(f"[LOAD] {topic} from {file_path}")
-
-        for event in read_jsonl(file_path):
-            if "event_time" not in event:
-                continue
-
-            all_events.append((topic, event))
-
-    print(f"[LOAD DONE] total events: {len(all_events):,}")
-    return all_events
-
-
 def main():
-    print("Kafka Producer 시작")
-    print(f"Bootstrap servers: {BOOTSTRAP_SERVERS}")
+    print("Kafka Producer2 시작", flush=True)
+    print(f"Bootstrap servers: {BOOTSTRAP_SERVERS}", flush=True)
 
     producer = create_producer()
-
-    all_events = load_all_events()
-
-    print("[SORT] event_time 기준 정렬 중...")
-    all_events.sort(key=lambda x: parse_event_time(x[1]))
-    print("[SORT DONE]")
-
-    print("[START SENDING]")
-    count = 0
+    total_count = 0
 
     try:
-        for topic, event in all_events:
-            key = event.get("order_id") or event.get("review_id") or event.get("event_id")
+        for topic, file_path in EVENT_SOURCES.items():
+            print(f"[SEND START] {topic} from {file_path}", flush=True)
 
-            producer.send(
-                topic=topic,
-                key=key,
-                value=event,
-            )
+            topic_count = 0
 
-            count += 1
+            for event in read_jsonl(file_path):
+                key = event.get("order_id") or event.get("review_id") or event.get("event_id")
 
-            if count % 1000 == 0:
-                current_interval = get_send_interval_seconds()
-                print(f"[PROGRESS] sent {count:,} events | interval={current_interval}s")
+                producer.send(
+                    topic=topic,
+                    key=key,
+                    value=event,
+                )
 
-            time.sleep(get_send_interval_seconds())
+                total_count += 1
+                topic_count += 1
+
+                if topic_count % 1000 == 0:
+                    interval = get_send_interval_seconds()
+                    print(
+                        f"[PROGRESS] topic={topic} sent={topic_count:,} total={total_count:,} interval={interval}s",
+                        flush=True,
+                    )
+                    producer.flush()
+
+                time.sleep(get_send_interval_seconds())
+
+            print(f"[SEND DONE] {topic}: {topic_count:,} events", flush=True)
 
         producer.flush()
 
     finally:
         producer.close()
 
-    print(f"[DONE] total sent: {count:,}")
+    print(f"[DONE] total sent: {total_count:,}", flush=True)
 
 
 if __name__ == "__main__":
