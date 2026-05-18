@@ -1,5 +1,6 @@
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import col, to_date, to_timestamp, datediff, date_format
+from pyspark.sql.utils import AnalysisException
 
 
 def create_spark_session():
@@ -21,11 +22,24 @@ def main():
     review_events_df = spark.read.parquet(review_events_path)
     reviews_df = spark.read.parquet(reviews_path)
 
-    processed_review_df = (
-        spark.read.parquet(output_path)
-        .select("review_id", "event_type")
-        .dropDuplicates(["review_id", "event_type"])
-    )
+    try:
+        processed_review_df = (
+            spark.read.parquet(output_path)
+            .select("review_id", "event_type")
+            .dropDuplicates(["review_id", "event_type"])
+        )
+        print("Existing fact_review found. Running incremental load.")
+
+    except AnalysisException as e:
+        if "PATH_NOT_FOUND" in str(e):
+            print("No existing fact_review found. Running initial load.")
+
+            processed_review_df = spark.createDataFrame(
+                [],
+                "review_id string, event_type string"
+            )
+        else:
+            raise e
 
     review_events_df = (
         review_events_df

@@ -1,5 +1,6 @@
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import col, to_date, to_timestamp, datediff, when, date_format
+from pyspark.sql.utils import AnalysisException
 
 
 def create_spark_session():
@@ -21,11 +22,24 @@ def main():
     delivery_events_df = spark.read.parquet(delivery_events_path)
     orders_df = spark.read.parquet(orders_path)
 
-    processed_delivery_df = (
-        spark.read.parquet(output_path)
-        .select("order_id", "event_type")
-        .dropDuplicates(["order_id", "event_type"])
-    )
+    try:
+        processed_delivery_df = (
+            spark.read.parquet(output_path)
+            .select("order_id", "event_type")
+            .dropDuplicates(["order_id", "event_type"])
+        )
+        print("Existing fact_delivery found. Running incremental load.")
+
+    except AnalysisException as e:
+        if "PATH_NOT_FOUND" in str(e):
+            print("No existing fact_delivery found. Running initial load.")
+
+            processed_delivery_df = spark.createDataFrame(
+                [],
+                "order_id string, event_type string"
+            )
+        else:
+            raise e
 
     delivery_events_df = (
         delivery_events_df
