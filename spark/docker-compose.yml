@@ -39,8 +39,8 @@ services:
       - spark-ivy:/opt/spark/.ivy2
     networks:
       - data-pipeline-net
-    cpus: 1.75
-    mem_limit: 7g
+    cpus: 2
+    mem_limit: 9g
 
   redis:
     image: redis:7
@@ -91,8 +91,8 @@ services:
     environment:
       MB_DB_FILE: /metabase-data/metabase.db
       JAVA_TOOL_OPTIONS: "-Xms512m -Xmx1G"
-    cpus: 0.75
-    mem_limit: 1536m
+    cpus: 0.5
+    mem_limit: 1g
 
   grafana:
     image: grafana/grafana:latest

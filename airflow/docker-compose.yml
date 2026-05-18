@@ -97,7 +97,7 @@ services:
       - data-pipeline-net
     command: bash -c "airflow scheduler"
     cpus: 0.5
-    mem_limit: 2g
+    mem_limit: 1536m
 
 networks:
   data-pipeline-net:
