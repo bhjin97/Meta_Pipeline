@@ -92,7 +92,8 @@ services:
       MB_DB_FILE: /metabase-data/metabase.db
       JAVA_TOOL_OPTIONS: "-Xms512m -Xmx1G"
     cpus: 0.5
-    mem_limit: 1g
+    mem_limit: 1536m
+    restart: unless-stopped
 
   grafana:
     image: grafana/grafana:latest
