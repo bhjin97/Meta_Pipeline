@@ -42,6 +42,8 @@ services:
     mem_limit: 1g
 
   airflow-webserver:
+    group_add:
+      - "121"
     build: .
     container_name: airflow-webserver
     depends_on:
@@ -65,6 +67,7 @@ services:
       - ./plugins:/opt/airflow/plugins
       - ../:/app
       - airflow-ivy-cache:/home/airflow/.ivy2
+      - /var/run/docker.sock:/var/run/docker.sock
     networks:
       - data-pipeline-net
     command: bash -c "airflow webserver"
@@ -72,6 +75,8 @@ services:
     mem_limit: 1g
 
   airflow-scheduler:
+    group_add:
+      - "121"
     build: .
     container_name: airflow-scheduler
     depends_on:
@@ -93,6 +98,7 @@ services:
       - ./plugins:/opt/airflow/plugins
       - ../:/app
       - airflow-ivy-cache:/home/airflow/.ivy2
+      - /var/run/docker.sock:/var/run/docker.sock
     networks:
       - data-pipeline-net
     command: bash -c "airflow scheduler"
