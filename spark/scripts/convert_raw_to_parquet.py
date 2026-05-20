@@ -14,7 +14,7 @@ DATASETS = {
 
     "reference/category_translation": "product_category_name_translation.csv",
 
-    "persona/nemotron_korea": "nemotron_persona_korea_sample.csv",
+    "persona/nemotron_korea": "nemotron_persona_korea_sample.parquet",
 }
 
 
