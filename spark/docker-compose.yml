@@ -42,6 +42,26 @@ services:
     cpus: 2
     mem_limit: 9g
 
+
+  spark-streaming:
+    build: .
+    image: apache/spark:3.5.1
+    container_name: spark-streaming
+    env_file:
+      - .env
+    depends_on:
+      - spark-master
+      - spark-worker
+    command: ["/app/spark/scripts/run_streaming.sh"]
+    volumes:
+      - ../:/app
+      - spark-ivy:/opt/spark/.ivy2
+    networks:
+      - data-pipeline-net
+    cpus: 0.5
+    mem_limit: 1536m
+    restart: unless-stopped
+
   redis:
     image: redis:7
     container_name: redis
