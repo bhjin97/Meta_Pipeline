@@ -3,7 +3,10 @@ import pendulum
 import os
 import json
 import requests
+import docker
 
+from airflow.operators.python import PythonOperator
+from airflow.utils.trigger_rule import TriggerRule
 from airflow import DAG
 from airflow.providers.apache.spark.operators.spark_submit import SparkSubmitOperator
 from airflow.utils.task_group import TaskGroup
@@ -74,6 +77,40 @@ default_args = {
     "on_failure_callback": lambda context: send_slack_alert(context, "failed"),
 }
 
+STREAMING_CONTAINER_NAME = "spark-streaming"
+
+
+def stop_streaming_container():
+    client = docker.from_env()
+
+    try:
+        container = client.containers.get(STREAMING_CONTAINER_NAME)
+
+        if container.status == "running":
+            print(f"Stopping {STREAMING_CONTAINER_NAME}...")
+            container.stop()
+        else:
+            print(f"{STREAMING_CONTAINER_NAME} is already stopped. status={container.status}")
+
+    except docker.errors.NotFound:
+        print(f"{STREAMING_CONTAINER_NAME} container not found. skip stop.")
+
+
+def start_streaming_container():
+    client = docker.from_env()
+
+    try:
+        container = client.containers.get(STREAMING_CONTAINER_NAME)
+
+        container.reload()
+        if container.status != "running":
+            print(f"Starting {STREAMING_CONTAINER_NAME}...")
+            container.start()
+        else:
+            print(f"{STREAMING_CONTAINER_NAME} is already running.")
+
+    except docker.errors.NotFound:
+        raise RuntimeError(f"{STREAMING_CONTAINER_NAME} container not found. cannot start streaming.")
 
 def create_spark_task(task_id: str, script_name: str, on_success_callback=None) -> SparkSubmitOperator:
     return SparkSubmitOperator(
@@ -125,5 +162,16 @@ with DAG(
             script_name="build_gold_marts.py",
             on_success_callback=lambda context: send_slack_alert(context, "success"),
         )
+    
+    stop_streaming = PythonOperator(
+        task_id="stop_streaming",
+        python_callable=stop_streaming_container,
+    )
 
-    silver_layer >> validation_layer >> gold_layer
+    start_streaming = PythonOperator(
+        task_id="start_streaming",
+        python_callable=start_streaming_container,
+        trigger_rule=TriggerRule.ALL_DONE,
+    )
+
+    stop_streaming >> silver_layer >> validation_layer >> gold_layer >> start_streaming
