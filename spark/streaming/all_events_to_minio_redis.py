@@ -1,6 +1,7 @@
 import os
 import json
 import redis
+from datetime import datetime, timedelta
 
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import col, from_json, to_timestamp, window
@@ -19,6 +20,8 @@ REDIS_PORT = int(os.environ["REDIS_PORT"])
 TOPIC_NAMES = "order-events,delivery-events,review-events"
 
 TIMESERIES_TTL_SECONDS = 60 * 60 * 24
+TRIGGER_SECONDS = 10
+EVENTS_PER_MIN_MULTIPLIER = 60 // TRIGGER_SECONDS
 
 EVENT_CONFIGS = {
     "order-events": {
@@ -80,26 +83,38 @@ def create_spark_session():
 
 def write_metrics_to_redis(redis_prefix):
     def _write(df, batch_id):
-        if df.isEmpty():
-            return
-
         r = redis.Redis(
             host=REDIS_HOST,
             port=REDIS_PORT,
             decode_responses=True,
         )
 
-        for row in df.collect():
+        now = datetime.now()
+        window_start = now.strftime("%Y-%m-%d %H:%M:%S")
+        window_end = (now + timedelta(seconds=TRIGGER_SECONDS)).strftime(
+            "%Y-%m-%d %H:%M:%S"
+        )
+
+        if df.isEmpty():
+            return
+
+        metrics_df = (
+            df.groupBy("event_type")
+            .count()
+            .withColumnRenamed("count", "batch_count")
+        )
+
+        for row in metrics_df.collect():
             event_type = row["event_type"]
-            window_start = str(row["window_start"])
-            window_end = str(row["window_end"])
-            event_count = int(row["event_count"])
+            batch_count = int(row["batch_count"])
+            event_count = batch_count * EVENTS_PER_MIN_MULTIPLIER
 
             value = {
-                "window_start": window_start,
-                "window_end": window_end,
+                "processed_at": window_start,
                 "event_type": event_type,
                 "event_count": event_count,
+                "batch_count": batch_count,
+                "trigger_seconds": TRIGGER_SECONDS,
                 "batch_id": batch_id,
             }
 
@@ -113,9 +128,11 @@ def write_metrics_to_redis(redis_prefix):
                 TIMESERIES_TTL_SECONDS,
                 json.dumps(value, ensure_ascii=False),
             )
-            r.incrby(total_key, event_count)
 
-        print(f"[BATCH {batch_id}] metrics saved to Redis: {redis_prefix}")
+            # total은 분당 환산값이 아니라 실제 처리 건수로 누적해야 함
+            r.incrby(total_key, batch_count)
+
+        print(f"[BATCH {batch_id}] processing-time metrics saved to Redis: {redis_prefix}")
 
     return _write
 
@@ -147,26 +164,15 @@ def build_topic_stream(kafka_df, topic_name, config):
         .start()
     )
 
-    metrics_df = (
-        parsed_df
-        .groupBy(window(col("event_time"), "1 minute"), col("event_type"))
-        .count()
-        .select(
-            col("window.start").alias("window_start"),
-            col("window.end").alias("window_end"),
-            col("event_type"),
-            col("count").alias("event_count"),
-        )
-    )
 
     metrics_query = (
-        metrics_df.writeStream
-        .outputMode("update")
+        parsed_df.writeStream
         .foreachBatch(write_metrics_to_redis(config["redis_prefix"]))
         .option(
             "checkpointLocation",
             f"/app/data/checkpoints/{topic_name.replace('-', '_')}_metrics"
         )
+        .trigger(processingTime=f"{TRIGGER_SECONDS} seconds")
         .start()
     )
 
