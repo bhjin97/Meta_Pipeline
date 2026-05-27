@@ -14,6 +14,16 @@ MINIO_ENDPOINT = os.environ["MINIO_ENDPOINT"]
 MINIO_ACCESS_KEY = os.environ["MINIO_ACCESS_KEY"]
 MINIO_SECRET_KEY = os.environ["MINIO_SECRET_KEY"]
 
+CHECKPOINT_BASE_PATH = os.getenv(
+    "CHECKPOINT_BASE_PATH",
+    "s3a://ecommerce/checkpoints/events"
+)
+
+METRICS_CHECKPOINT_BASE_PATH = os.getenv(
+    "METRICS_CHECKPOINT_BASE_PATH",
+    "/app/data/checkpoints"
+)
+
 REDIS_HOST = os.environ["REDIS_HOST"]
 REDIS_PORT = int(os.environ["REDIS_PORT"])
 
@@ -159,7 +169,7 @@ def build_topic_stream(kafka_df, topic_name, config):
         .option("path", config["output_path"])
         .option(
             "checkpointLocation",
-            f"s3a://ecommerce/checkpoints/events/{topic_name.replace('-', '_')}_raw/"
+            f"{CHECKPOINT_BASE_PATH}/{topic_name.replace('-', '_')}_raw/"
         )
         .start()
     )
@@ -170,7 +180,7 @@ def build_topic_stream(kafka_df, topic_name, config):
         .foreachBatch(write_metrics_to_redis(config["redis_prefix"]))
         .option(
             "checkpointLocation",
-            f"/app/data/checkpoints/{topic_name.replace('-', '_')}_metrics"
+            f"{METRICS_CHECKPOINT_BASE_PATH}/{topic_name.replace('-', '_')}_metrics"
         )
         .trigger(processingTime=f"{TRIGGER_SECONDS} seconds")
         .start()
