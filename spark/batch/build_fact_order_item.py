@@ -1,6 +1,24 @@
+import argparse
+
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import col, to_date, date_format
 from pyspark.sql.utils import AnalysisException
+
+
+def parse_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--mode",
+        default="prod",
+        choices=["prod", "load_test"],
+        help="prod: original data only, load_test: original + load test data",
+    )
+    parser.add_argument(
+        "--test-run-id",
+        default="",
+        help="load test id, e.g. load_test_001",
+    )
+    return parser.parse_args()
 
 
 def create_spark_session():
@@ -12,6 +30,8 @@ def create_spark_session():
 
 
 def main():
+    args = parse_args()
+
     spark = create_spark_session()
     spark.sparkContext.setLogLevel("WARN")
 
@@ -23,6 +43,25 @@ def main():
     order_events_df = spark.read.parquet(order_events_path)
     order_items_df = spark.read.parquet(order_items_path)
     payments_df = spark.read.parquet(payments_path)
+
+    if args.mode == "load_test":
+        if not args.test_run_id:
+            raise ValueError("--test-run-id is required when --mode load_test")
+
+        load_test_order_items_path = (
+            f"s3a://ecommerce/bronze/load_test/"
+            f"{args.test_run_id}/order_items/"
+        )
+
+        load_test_order_items_df = spark.read.parquet(load_test_order_items_path)
+
+        order_items_df = order_items_df.unionByName(load_test_order_items_df)
+
+        print(f"Load test mode enabled")
+        print(f"test_run_id: {args.test_run_id}")
+        print(f"load_test_order_items_path: {load_test_order_items_path}")
+    else:
+        print("Prod mode enabled. Using original order_items only.")
 
     try:
         processed_order_item_df = (
@@ -109,6 +148,8 @@ def main():
         .parquet(output_path)
 
     print("fact_order_item incremental build completed")
+    print(f"mode: {args.mode}")
+    print(f"test_run_id: {args.test_run_id}")
     print(f"new row count: {new_count}")
 
     spark.stop()
