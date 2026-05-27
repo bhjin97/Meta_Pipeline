@@ -57,7 +57,7 @@ EVENT_CONFIGS = {
             StructField("event_time", StringType(), True),
             StructField("order_id", StringType(), True),
             StructField("customer_id", StringType(), True),
-            StructField("delivery_status", StringType(), True),
+            StructField("order_status", StringType(), True),
         ]),
     },
     "review-events": {
@@ -158,8 +158,7 @@ def build_topic_stream(kafka_df, topic_name, config):
         .filter(col("event_id").isNotNull())
         .filter(col("event_time").isNotNull())
         .filter(col("event_type").isNotNull())
-        #.withWatermark("event_time", "2 minutes")
-        #.dropDuplicates(["event_id"])
+        .dropDuplicates(["event_id"])
     )
 
     raw_query = (
