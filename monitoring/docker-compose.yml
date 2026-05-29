@@ -3,6 +3,9 @@ services:
     image: gcr.io/cadvisor/cadvisor:latest
     container_name: cadvisor
     privileged: true
+    command:
+      - "--docker_only=true"
+      - "--housekeeping_interval=10s"
     ports:
       - "8088:8080"
     volumes:
