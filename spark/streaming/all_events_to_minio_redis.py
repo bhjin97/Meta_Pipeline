@@ -4,7 +4,7 @@ import redis
 from datetime import datetime, timedelta
 
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import col, from_json, to_timestamp, window
+from pyspark.sql.functions import col, from_json, to_timestamp
 from pyspark.sql.types import StructType, StructField, StringType
 
 
@@ -14,30 +14,54 @@ MINIO_ENDPOINT = os.environ["MINIO_ENDPOINT"]
 MINIO_ACCESS_KEY = os.environ["MINIO_ACCESS_KEY"]
 MINIO_SECRET_KEY = os.environ["MINIO_SECRET_KEY"]
 
+REDIS_HOST = os.environ["REDIS_HOST"]
+REDIS_PORT = int(os.environ["REDIS_PORT"])
+
+STREAM_MODE = os.getenv("STREAM_MODE", "prod")
+
+if STREAM_MODE == "load_test":
+    TOPIC_PREFIX = "load-test-"
+    DEFAULT_CHECKPOINT_BASE_PATH = "s3a://ecommerce/checkpoints/load_test/load_test_001/events"
+    DEFAULT_METRICS_CHECKPOINT_BASE_PATH = "/app/data/checkpoints/load_test/load_test_001"
+    OUTPUT_BASE_PATH = "s3a://ecommerce/bronze/load_test/load_test_001/events"
+    REDIS_PREFIX_BASE = "streaming:load_test"
+else:
+    TOPIC_PREFIX = ""
+    DEFAULT_CHECKPOINT_BASE_PATH = "s3a://ecommerce/checkpoints/events"
+    DEFAULT_METRICS_CHECKPOINT_BASE_PATH = "/app/data/checkpoints"
+    OUTPUT_BASE_PATH = "s3a://ecommerce/bronze/events"
+    REDIS_PREFIX_BASE = "streaming"
+
 CHECKPOINT_BASE_PATH = os.getenv(
     "CHECKPOINT_BASE_PATH",
-    "s3a://ecommerce/checkpoints/events"
+    DEFAULT_CHECKPOINT_BASE_PATH
 )
 
 METRICS_CHECKPOINT_BASE_PATH = os.getenv(
     "METRICS_CHECKPOINT_BASE_PATH",
-    "/app/data/checkpoints"
+    DEFAULT_METRICS_CHECKPOINT_BASE_PATH
 )
 
-REDIS_HOST = os.environ["REDIS_HOST"]
-REDIS_PORT = int(os.environ["REDIS_PORT"])
+ORDER_TOPIC = f"{TOPIC_PREFIX}order-events"
+DELIVERY_TOPIC = f"{TOPIC_PREFIX}delivery-events"
+REVIEW_TOPIC = f"{TOPIC_PREFIX}review-events"
 
-TOPIC_NAMES = "order-events,delivery-events,review-events"
+TOPIC_NAMES = ",".join([
+    ORDER_TOPIC,
+    DELIVERY_TOPIC,
+    REVIEW_TOPIC,
+])
 
 TIMESERIES_TTL_SECONDS = 60 * 60 * 24
 TRIGGER_SECONDS = 10
 EVENTS_PER_MIN_MULTIPLIER = 60 // TRIGGER_SECONDS
 
+
 EVENT_CONFIGS = {
-    "order-events": {
+    ORDER_TOPIC: {
         "app_name": "Order Events Streaming",
-        "output_path": "s3a://ecommerce/bronze/events/order_events/",
-        "redis_prefix": "streaming:order",
+        "output_path": f"{OUTPUT_BASE_PATH}/order_events/",
+        "redis_prefix": f"{REDIS_PREFIX_BASE}:order",
         "schema": StructType([
             StructField("event_id", StringType(), True),
             StructField("event_type", StringType(), True),
@@ -47,10 +71,10 @@ EVENT_CONFIGS = {
             StructField("order_status", StringType(), True),
         ]),
     },
-    "delivery-events": {
+    DELIVERY_TOPIC: {
         "app_name": "Delivery Events Streaming",
-        "output_path": "s3a://ecommerce/bronze/events/delivery_events/",
-        "redis_prefix": "streaming:delivery",
+        "output_path": f"{OUTPUT_BASE_PATH}/delivery_events/",
+        "redis_prefix": f"{REDIS_PREFIX_BASE}:delivery",
         "schema": StructType([
             StructField("event_id", StringType(), True),
             StructField("event_type", StringType(), True),
@@ -58,12 +82,13 @@ EVENT_CONFIGS = {
             StructField("order_id", StringType(), True),
             StructField("customer_id", StringType(), True),
             StructField("order_status", StringType(), True),
+            StructField("order_estimated_delivery_date", StringType(), True),
         ]),
     },
-    "review-events": {
+    REVIEW_TOPIC: {
         "app_name": "Review Events Streaming",
-        "output_path": "s3a://ecommerce/bronze/events/review_events/",
-        "redis_prefix": "streaming:review",
+        "output_path": f"{OUTPUT_BASE_PATH}/review_events/",
+        "redis_prefix": f"{REDIS_PREFIX_BASE}:review",
         "schema": StructType([
             StructField("event_id", StringType(), True),
             StructField("event_type", StringType(), True),
@@ -80,7 +105,7 @@ EVENT_CONFIGS = {
 def create_spark_session():
     return (
         SparkSession.builder
-        .appName("All Events Streaming")
+        .appName(f"All Events Streaming - {STREAM_MODE}")
         .master("spark://spark-master:7077")
         .config("spark.hadoop.fs.s3a.endpoint", MINIO_ENDPOINT)
         .config("spark.hadoop.fs.s3a.access.key", MINIO_ACCESS_KEY)
@@ -101,9 +126,6 @@ def write_metrics_to_redis(redis_prefix):
 
         now = datetime.now()
         window_start = now.strftime("%Y-%m-%d %H:%M:%S")
-        window_end = (now + timedelta(seconds=TRIGGER_SECONDS)).strftime(
-            "%Y-%m-%d %H:%M:%S"
-        )
 
         if df.isEmpty():
             return
@@ -126,6 +148,7 @@ def write_metrics_to_redis(redis_prefix):
                 "batch_count": batch_count,
                 "trigger_seconds": TRIGGER_SECONDS,
                 "batch_id": batch_id,
+                "stream_mode": STREAM_MODE,
             }
 
             latest_key = f"{redis_prefix}:latest:{event_type}"
@@ -138,16 +161,16 @@ def write_metrics_to_redis(redis_prefix):
                 TIMESERIES_TTL_SECONDS,
                 json.dumps(value, ensure_ascii=False),
             )
-
-            # total은 분당 환산값이 아니라 실제 처리 건수로 누적해야 함
             r.incrby(total_key, batch_count)
 
-        print(f"[BATCH {batch_id}] processing-time metrics saved to Redis: {redis_prefix}")
+        print(f"[BATCH {batch_id}] metrics saved to Redis: {redis_prefix}")
 
     return _write
 
 
 def build_topic_stream(kafka_df, topic_name, config):
+    topic_key = topic_name.replace("-", "_")
+
     parsed_df = (
         kafka_df
         .filter(col("topic") == topic_name)
@@ -163,23 +186,24 @@ def build_topic_stream(kafka_df, topic_name, config):
 
     raw_query = (
         parsed_df.writeStream
+        .queryName(f"{topic_key}_raw")
         .format("parquet")
         .outputMode("append")
         .option("path", config["output_path"])
         .option(
             "checkpointLocation",
-            f"{CHECKPOINT_BASE_PATH}/{topic_name.replace('-', '_')}_raw/"
+            f"{CHECKPOINT_BASE_PATH}/{topic_key}_raw/"
         )
         .start()
     )
 
-
     metrics_query = (
         parsed_df.writeStream
+        .queryName(f"{topic_key}_metrics")
         .foreachBatch(write_metrics_to_redis(config["redis_prefix"]))
         .option(
             "checkpointLocation",
-            f"{METRICS_CHECKPOINT_BASE_PATH}/{topic_name.replace('-', '_')}_metrics"
+            f"{METRICS_CHECKPOINT_BASE_PATH}/{topic_key}_metrics"
         )
         .trigger(processingTime=f"{TRIGGER_SECONDS} seconds")
         .start()
@@ -191,6 +215,12 @@ def build_topic_stream(kafka_df, topic_name, config):
 def main():
     spark = create_spark_session()
     spark.sparkContext.setLogLevel("WARN")
+
+    print(f"[CONFIG] STREAM_MODE={STREAM_MODE}")
+    print(f"[CONFIG] TOPIC_NAMES={TOPIC_NAMES}")
+    print(f"[CONFIG] CHECKPOINT_BASE_PATH={CHECKPOINT_BASE_PATH}")
+    print(f"[CONFIG] METRICS_CHECKPOINT_BASE_PATH={METRICS_CHECKPOINT_BASE_PATH}")
+    print(f"[CONFIG] OUTPUT_BASE_PATH={OUTPUT_BASE_PATH}")
 
     kafka_df = (
         spark.readStream
@@ -213,7 +243,9 @@ def main():
 
     print("[STARTED] all event streaming queries started")
 
-    spark.streams.awaitAnyTermination()
+    for query in queries:
+        print(f"[WAITING] query={query.name}, id={query.id}")
+        query.awaitTermination()
 
 
 if __name__ == "__main__":

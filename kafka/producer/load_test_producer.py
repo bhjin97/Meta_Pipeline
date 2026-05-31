@@ -37,6 +37,11 @@ def parse_args():
         default=None,
         help="Maximum number of events to send",
     )
+    parser.add_argument(
+        "--topic-prefix",
+        default="load-test-",
+        help="Prefix added to topic name. Example: load-test-",
+    )
 
     return parser.parse_args()
 
@@ -44,6 +49,16 @@ def parse_args():
 def delivery_report(err, msg):
     if err is not None:
         print(f"[DELIVERY FAILED] topic={msg.topic()} error={err}")
+
+
+def build_target_topic(original_topic, topic_prefix):
+    if not topic_prefix:
+        return original_topic
+
+    if original_topic.startswith(topic_prefix):
+        return original_topic
+
+    return f"{topic_prefix}{original_topic}"
 
 
 def main():
@@ -75,6 +90,7 @@ def main():
     print(f"events_per_sec: {args.events_per_sec}")
     print(f"start_offset: {args.start_offset}")
     print(f"max_events: {args.max_events}")
+    print(f"topic_prefix: {args.topic_prefix}")
 
     with input_file.open("r", encoding="utf-8") as f:
         for line_no, line in enumerate(f):
@@ -90,7 +106,10 @@ def main():
                 continue
 
             row = json.loads(line)
-            topic = row["topic"]
+
+            original_topic = row["topic"]
+            topic = build_target_topic(original_topic, args.topic_prefix)
+
             event = row["event"]
 
             value = json.dumps(event, ensure_ascii=False).encode("utf-8")

@@ -72,9 +72,10 @@ services:
       - spark-master 
       - spark-worker 
     command: ["/app/spark/scripts/run_streaming.sh"] 
-    environment: 
-      - CHECKPOINT_BASE_PATH=s3a://ecommerce/checkpoints/load_test/load_test_001/events 
-      - METRICS_CHECKPOINT_BASE_PATH=/app/data/checkpoints/load_test/load_test_001 
+    environment:
+      - STREAM_MODE=load_test
+      - CHECKPOINT_BASE_PATH=s3a://ecommerce/checkpoints/load_test/load_test_001/events
+      - METRICS_CHECKPOINT_BASE_PATH=/app/data/checkpoints/load_test/load_test_001
     volumes: 
       - ../:/app 
       - spark-ivy:/opt/spark/.ivy2 
