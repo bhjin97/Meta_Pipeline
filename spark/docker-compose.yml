@@ -72,6 +72,8 @@ services:
       - spark-master 
       - spark-worker 
     command: ["/app/spark/scripts/run_streaming.sh"] 
+    ports:
+      - "14041:4040"
     environment:
       - STREAM_MODE=load_test
       - CHECKPOINT_BASE_PATH=s3a://ecommerce/checkpoints/load_test/load_test_001/events
