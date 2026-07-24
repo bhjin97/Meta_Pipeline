@@ -53,7 +53,7 @@ TOPIC_NAMES = ",".join([
 ])
 
 TIMESERIES_TTL_SECONDS = 60 * 60 * 24
-TRIGGER_SECONDS = 30
+TRIGGER_SECONDS = 10
 EVENTS_PER_MIN_MULTIPLIER = 60 // TRIGGER_SECONDS
 
 
@@ -107,6 +107,8 @@ def create_spark_session():
         SparkSession.builder
         .appName(f"All Events Streaming - {STREAM_MODE}")
         .master("spark://spark-master:7077")
+        .config("spark.ui.enabled", "true")
+        .config("spark.ui.port", "4040")
         .config("spark.hadoop.fs.s3a.endpoint", MINIO_ENDPOINT)
         .config("spark.hadoop.fs.s3a.access.key", MINIO_ACCESS_KEY)
         .config("spark.hadoop.fs.s3a.secret.key", MINIO_SECRET_KEY)
