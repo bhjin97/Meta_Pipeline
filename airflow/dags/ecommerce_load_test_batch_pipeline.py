@@ -31,7 +31,7 @@ SPARK_CONF = {
 
 KST = pendulum.timezone("Asia/Seoul")
 
-LOAD_TEST_RUN_ID = "load_test_001"
+LOAD_TEST_RUN_ID = "load_test_1000000"
 
 
 def send_slack_alert(context, status):

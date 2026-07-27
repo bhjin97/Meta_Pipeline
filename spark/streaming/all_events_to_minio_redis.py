@@ -21,9 +21,9 @@ STREAM_MODE = os.getenv("STREAM_MODE", "prod")
 
 if STREAM_MODE == "load_test":
     TOPIC_PREFIX = "load-test-"
-    DEFAULT_CHECKPOINT_BASE_PATH = "s3a://ecommerce/checkpoints/load_test/load_test_001/events"
-    DEFAULT_METRICS_CHECKPOINT_BASE_PATH = "/app/data/checkpoints/load_test/load_test_001"
-    OUTPUT_BASE_PATH = "s3a://ecommerce/bronze/load_test/load_test_001/events"
+    DEFAULT_CHECKPOINT_BASE_PATH = "s3a://ecommerce/checkpoints/load_test/load_test_1000000/events"
+    DEFAULT_METRICS_CHECKPOINT_BASE_PATH = "/app/data/checkpoints/load_test/load_test_1000000"
+    OUTPUT_BASE_PATH = "s3a://ecommerce/bronze/load_test/load_test_1000000/events"
     REDIS_PREFIX_BASE = "streaming:load_test"
 else:
     TOPIC_PREFIX = ""
