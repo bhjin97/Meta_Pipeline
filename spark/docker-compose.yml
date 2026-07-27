@@ -76,8 +76,9 @@ services:
       - "14041:4040"
     environment:
       - STREAM_MODE=load_test
-      - CHECKPOINT_BASE_PATH=s3a://ecommerce/checkpoints/load_test/load_test_001/events
-      - METRICS_CHECKPOINT_BASE_PATH=/app/data/checkpoints/load_test/load_test_001
+      - LOAD_TEST_ID=${LOAD_TEST_ID:-load_test_1000000}
+      - CHECKPOINT_BASE_PATH=s3a://ecommerce/checkpoints/load_test/${LOAD_TEST_ID:-load_test_1000000}/events
+      - METRICS_CHECKPOINT_BASE_PATH=/app/data/checkpoints/load_test/${LOAD_TEST_ID:-load_test_1000000}
     volumes: 
       - ../:/app 
       - spark-ivy:/opt/spark/.ivy2 

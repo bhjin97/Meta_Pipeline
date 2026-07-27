@@ -6,6 +6,9 @@ from pathlib import Path
 from confluent_kafka import Producer
 
 
+RATE_BATCH_SIZE = 100
+
+
 def parse_args():
     parser = argparse.ArgumentParser()
 
@@ -22,8 +25,8 @@ def parse_args():
     parser.add_argument(
         "--events-per-sec",
         type=float,
-        default=100.0,
-        help="Target events per second",
+        default=2500.0,
+        help="Target events per second. Use 0 for unlimited.",
     )
     parser.add_argument(
         "--start-offset",
@@ -77,11 +80,10 @@ def main():
         "batch.num.messages": 10000,
     })
 
-    sleep_interval = 1.0 / args.events_per_sec if args.events_per_sec > 0 else 0
-
     sent_count = 0
     skipped_count = 0
-    start_time = time.time()
+
+    start_time = time.perf_counter()
     last_log_time = start_time
 
     print("load test producer started")
@@ -108,31 +110,71 @@ def main():
             row = json.loads(line)
 
             original_topic = row["topic"]
-            topic = build_target_topic(original_topic, args.topic_prefix)
+            topic = build_target_topic(
+                original_topic,
+                args.topic_prefix,
+            )
 
             event = row["event"]
 
-            value = json.dumps(event, ensure_ascii=False).encode("utf-8")
-            key = event.get("order_id", event.get("event_id", "")).encode("utf-8")
+            value = json.dumps(
+                event,
+                ensure_ascii=False,
+            ).encode("utf-8")
 
-            producer.produce(
-                topic=topic,
-                key=key,
-                value=value,
-                callback=delivery_report,
+            key_value = event.get(
+                "order_id",
+                event.get("event_id", ""),
             )
+
+            key = str(key_value).encode("utf-8")
+
+            while True:
+                try:
+                    producer.produce(
+                        topic=topic,
+                        key=key,
+                        value=value,
+                        callback=delivery_report,
+                    )
+                    break
+
+                except BufferError:
+                    producer.poll(0.1)
 
             producer.poll(0)
 
             sent_count += 1
 
-            if sleep_interval > 0:
-                time.sleep(sleep_interval)
+            # 100건 단위로 목표 EPS 보정
+            if (
+                args.events_per_sec > 0
+                and sent_count % RATE_BATCH_SIZE == 0
+            ):
+                expected_elapsed = (
+                    sent_count / args.events_per_sec
+                )
 
-            now = time.time()
+                actual_elapsed = (
+                    time.perf_counter() - start_time
+                )
+
+                remaining = (
+                    expected_elapsed - actual_elapsed
+                )
+
+                if remaining > 0:
+                    time.sleep(remaining)
+
+            now = time.perf_counter()
+
             if now - last_log_time >= 10:
                 elapsed = now - start_time
-                current_eps = sent_count / elapsed if elapsed > 0 else 0
+                current_eps = (
+                    sent_count / elapsed
+                    if elapsed > 0
+                    else 0
+                )
 
                 print(
                     f"[PROGRESS] sent={sent_count:,}, "
@@ -145,8 +187,15 @@ def main():
 
     producer.flush()
 
-    total_elapsed = time.time() - start_time
-    avg_eps = sent_count / total_elapsed if total_elapsed > 0 else 0
+    total_elapsed = (
+        time.perf_counter() - start_time
+    )
+
+    avg_eps = (
+        sent_count / total_elapsed
+        if total_elapsed > 0
+        else 0
+    )
 
     print("load test producer finished")
     print(f"sent_count: {sent_count:,}")
