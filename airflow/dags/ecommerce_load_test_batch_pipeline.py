@@ -178,6 +178,13 @@ with DAG(
             on_success_callback=lambda context: send_slack_alert(context, "success"),
         )
 
+    with TaskGroup("serving_layer") as serving_layer:
+        load_serving_fact_order_item = create_spark_task(
+            task_id="load_serving_fact_order_item",
+            script_name="load_postgres_fact_order_item.py",
+            on_success_callback=lambda context: send_slack_alert(context, "success"),
+        )
+
     stop_streaming = PythonOperator(
         task_id="stop_streaming",
         python_callable=stop_streaming_container,
@@ -189,4 +196,4 @@ with DAG(
         trigger_rule=TriggerRule.ALL_DONE,
     )
 
-    stop_streaming >> silver_layer >> validation_layer >> gold_layer >> start_streaming
+    stop_streaming >> silver_layer >> validation_layer >> gold_layer >> serving_layer >> start_streaming
