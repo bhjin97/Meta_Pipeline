@@ -29,3 +29,22 @@
 ![Oracle Cloud](https://img.shields.io/badge/Oracle_Cloud-F80000?style=flat-square&logo=oracle&logoColor=white)
 ![Docker](https://img.shields.io/badge/Docker-2496ED?style=flat-square&logo=docker&logoColor=white)
 ![Ubuntu](https://img.shields.io/badge/Ubuntu-E95420?style=flat-square&logo=ubuntu&logoColor=white)
+
+## 📌 Project Overview
+
+이커머스 환경에서 발생하는 주문·배송·리뷰 이벤트를 실시간으로 수집하고,  
+정적 데이터와 결합해 분석용 데이터 마트까지 제공하는 데이터 파이프라인을 구축했습니다.
+
+실시간 이벤트는 Kafka와 Spark Structured Streaming으로 수집·적재하고,  
+Airflow 기반 Spark Batch를 통해 Bronze–Silver–Gold 계층으로 정제합니다.  
+최종 데이터는 PostgreSQL과 Metabase를 통해 분석에 활용하며,  
+Grafana 모니터링과 Slack 실패 알림을 통해 운영 상태를 확인할 수 있도록 구성했습니다.
+
+| 항목 | 내용 |
+|---|---|
+| 프로젝트 형태 | 개인 프로젝트 |
+| 데이터셋 | Brazilian E-Commerce Public Dataset by Olist |
+| 처리 방식 | 실시간 스트리밍 + 주기적 배치 |
+| 실행 환경 | Oracle Cloud Compute Instance |
+| 주요 데이터 | 주문·배송·리뷰 이벤트 및 고객·상품·판매자 데이터 |
+| 제공 결과 | 분석용 데이터 마트 및 BI 대시보드 |
