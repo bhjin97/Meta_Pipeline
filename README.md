@@ -98,3 +98,61 @@ Spark Batch는 정적 데이터 결합과 Fact·Dimension·Mart 생성을 담당
 ![Oracle Cloud](https://img.shields.io/badge/Oracle_Cloud-F80000?style=flat-square&logo=oracle&logoColor=white)
 ![Docker](https://img.shields.io/badge/Docker-2496ED?style=flat-square&logo=docker&logoColor=white)
 ![Ubuntu](https://img.shields.io/badge/Ubuntu-E95420?style=flat-square&logo=ubuntu&logoColor=white)
+
+---
+
+## 🗂 데이터 계층
+
+데이터를 가공 수준과 사용 목적에 따라 Bronze–Silver–Gold 계층으로 분리했습니다.
+
+`Kafka Event + Olist Data → Bronze → Silver → Gold → PostgreSQL → Metabase`
+
+| 계층 | 역할 | 주요 처리 |
+|---|---|---|
+| **Bronze** | 원본 데이터 보존 | Kafka 이벤트와 Olist 정적 데이터를 Parquet 형식으로 저장 |
+| **Silver** | 분석 가능한 표준 데이터 생성 | 데이터 정제·중복 제거·조인을 통해 Fact·Dimension 테이블 생성 |
+| **Gold** | 분석 목적별 데이터 집계 | 매출·배송·리뷰·고객 세그먼트 기반 데이터 마트 생성 |
+
+- **Data Lake:** MinIO의 Bronze → Silver → Gold
+- **Serving:** PostgreSQL을 통한 SQL 조회 및 Metabase 대시보드 제공
+
+---
+## 🔧 대표 트러블슈팅
+
+### 스트리밍 컨테이너 반복 재시작과 데이터 중복
+
+**문제**
+
+여러 개의 Structured Streaming Query 중 하나가 종료되면 스트리밍 프로세스 전체가 종료되고, Docker의 재시작 정책에 의해 컨테이너가 반복적으로 재실행되었습니다. 이 과정에서 Grafana에 동일 컨테이너의 시계열이 여러 개 나타나고 Redis 처리량이 비정상적으로 누적되는 현상이 발생했습니다.
+
+**원인**
+
+`awaitAnyTermination()` 구조에서는 실행 중인 Query 하나가 종료될 때 대기 상태가 해제되면서 애플리케이션이 종료되었습니다. 이후 컨테이너가 재시작되었고, 체크포인트를 초기화한 상태에서는 Kafka에 남아 있던 메시지를 `earliest`부터 다시 처리하면서 기존 이벤트가 중복 집계되었습니다.
+
+**해결**
+
+각 Streaming Query에 `queryName`을 부여하고 Query별 종료 대기 구조로 변경하여, 특정 Query의 종료가 전체 프로세스의 반복 재시작으로 이어지지 않도록 수정했습니다. 운영·테스트 토픽과 체크포인트도 분리하고 기존 체크포인트를 정리한 뒤 데이터 흐름을 다시 검증했습니다.
+
+**결과**
+
+컨테이너의 반복 재시작이 중단되었으며 Redis·Grafana의 중복 집계와 Prometheus의 불필요한 다중 시계열 발생을 방지했습니다.
+
+---
+
+### 스트리밍과 배치의 리소스 경쟁
+
+**문제**
+
+4 CPU·24GB RAM의 단일 VM에서 Spark Streaming과 Spark Batch를 동시에 실행하면 CPU와 메모리 사용량이 증가하고 배치 작업이 대기하거나 실패할 가능성이 발생했습니다.
+
+**원인**
+
+지속적으로 동작하는 스트리밍 작업과 대규모 조인·집계를 수행하는 배치 작업이 동일한 Spark Worker 자원을 동시에 사용했습니다.
+
+**해결**
+
+Airflow DAG에서 배치 실행 전 스트리밍을 중지하고, 배치 완료 후 다시 시작하도록 실행 순서를 변경했습니다. 중단 중 유입되는 이벤트는 Kafka에 보존하고, 재시작 후 Spark 체크포인트를 기준으로 미처리 이벤트를 이어서 처리하도록 구성했습니다.
+
+**결과**
+
+스트리밍과 배치의 자원 경쟁을 줄이면서 배치 작업을 안정적으로 완료했고, 스트리밍 중단 구간에 발생한 이벤트도 재시작 후 정상적으로 처리되는 것을 확인했습니다.
