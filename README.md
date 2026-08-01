@@ -38,7 +38,7 @@ Airflow가 주기적인 Spark Batch 작업을 오케스트레이션하여 Silver
 | 핵심 성과 | 검증 결과 |
 |---|---|
 | 하이브리드 파이프라인 구축 | Kafka 기반 실시간 처리와 Airflow로 자동화한 주기적 배치 처리를 하나의 데이터 흐름으로 통합 |
-| 스트리밍 안정성 검증 | 100만 건의 이벤트를 최대 설정 값 10,000 EPS로 입력하고 Kafka → Spark → MinIO 구간의 최종 적재 확인 |
+| 스트리밍 안정성 검증 | 100만 건의 이벤트를 최대 설정 값 10,000 EPS로 전송하고 Kafka → Spark → MinIO 구간의 최종 적재 확인 |
 | 대량 배치 처리 검증 | 100만 건 규모의 데이터를 Silver·Gold 계층과 PostgreSQL 데이터 마트까지 정상 처리 |
 | 운영 복구 구조 검증 | 스트리밍 중단 중 Kafka에 보존된 이벤트를 재시작 후 체크포인트를 기준으로 이어서 처리 |
 | 분석 성능 개선 | PostgreSQL 인덱스 적용 전후의 조회 성능을 비교하여 분석 쿼리 최적화 효과 확인 |
@@ -105,9 +105,9 @@ flowchart LR
 | 구분 | 내용 |
 |---|---|
 | **현상** | 스트리밍 컨테이너가 반복적으로 재시작되고, Grafana에 동일 컨테이너의 시계열이 여러 개 생성되면서 Redis 누적 수치가 비정상적으로 증가했습니다. |
-| **원인** | 여러 Streaming Query를 `awaitAnyTermination()`으로 관리해 Query 하나가 종료되면 애플리케이션 전체의 대기 상태가 해제되었습니다. Docker가 컨테이너를 재시작한 뒤 체크포인트가 없는 데이터는 Kafka의 `earliest`부터 다시 처리되어 중복 집계로 이어졌습니다. |
+| **원인** | 여러 Streaming Query를 `awaitAnyTermination()`으로 관리해 Query 하나가 종료되면 애플리케이션 전체의 대기 상태가 해제되었습니다. 이후 Docker 재시작이 반복되었고, 체크포인트를 초기화한 테스트 환경에서는 Kafka의 `earliest`부터 기존 이벤트가 다시 처리되면서 Redis 지표가 중복 집계되었습니다.  |
 | **조치** | Query별 참조를 유지하고 각각의 종료 상태를 관리하도록 애플리케이션 생명주기 구조를 변경했습니다. `queryName`을 부여해 Query 식별성을 높였으며, 운영·부하 테스트용 토픽과 체크포인트 경로도 분리했습니다. |
-| **결과** | 컨테이너의 반복 재시작과 불필요한 이벤트 재처리가 중단되었습니다. Redis·Grafana의 중복 집계와 Prometheus의 다중 시계열 생성도 방지했습니다. |
+| **결과** | 컨테이너의 반복 재시작을 방지하고 운영·테스트 처리 상태를 격리했습니다. 이를 통해 테스트 과정의 불필요한 이벤트 재처리와 Redis·Grafana 지표 혼선을 방지했습니다. |
 
 > **핵심 개선:** Query 식별, 애플리케이션 생명주기 관리, 체크포인트 격리를 각각 분리해 스트리밍 실행 안정성을 높였습니다.
 
@@ -194,6 +194,7 @@ flowchart LR
 ![Metabase](https://img.shields.io/badge/Metabase-509EE3?style=flat-square&logo=metabase&logoColor=white)
 ![Grafana](https://img.shields.io/badge/Grafana-F46800?style=flat-square&logo=grafana&logoColor=white)
 ![Slack](https://img.shields.io/badge/Slack-4A154B?style=flat-square&logo=slack&logoColor=white)
+![Prometheus](https://img.shields.io/badge/Prometheus-E6522C?style=flat-square&logo=prometheus&logoColor=white)
 
 ### Infrastructure
 
