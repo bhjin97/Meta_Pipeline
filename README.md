@@ -72,35 +72,6 @@ Spark Batch는 정적 데이터 결합과 Fact·Dimension·Mart 생성을 담당
 
 ---
 
-## 🛠 Tech Stack
-
-### Data Processing & Orchestration
-
-![Python](https://img.shields.io/badge/Python-3776AB?style=flat-square&logo=python&logoColor=white)
-![Apache Kafka](https://img.shields.io/badge/Apache_Kafka-231F20?style=flat-square&logo=apachekafka&logoColor=white)
-![Apache Spark](https://img.shields.io/badge/Apache_Spark-E25A1C?style=flat-square&logo=apachespark&logoColor=white)
-![Apache Airflow](https://img.shields.io/badge/Apache_Airflow-017CEE?style=flat-square&logo=apacheairflow&logoColor=white)
-
-### Storage & Database
-
-![MinIO](https://img.shields.io/badge/MinIO-C72E49?style=flat-square&logo=minio&logoColor=white)
-![PostgreSQL](https://img.shields.io/badge/PostgreSQL-4169E1?style=flat-square&logo=postgresql&logoColor=white)
-![Redis](https://img.shields.io/badge/Redis-FF4438?style=flat-square&logo=redis&logoColor=white)
-
-### Analytics & Monitoring
-
-![Metabase](https://img.shields.io/badge/Metabase-509EE3?style=flat-square&logo=metabase&logoColor=white)
-![Grafana](https://img.shields.io/badge/Grafana-F46800?style=flat-square&logo=grafana&logoColor=white)
-![Slack](https://img.shields.io/badge/Slack-4A154B?style=flat-square&logo=slack&logoColor=white)
-
-### Infrastructure
-
-![Oracle Cloud](https://img.shields.io/badge/Oracle_Cloud-F80000?style=flat-square&logo=oracle&logoColor=white)
-![Docker](https://img.shields.io/badge/Docker-2496ED?style=flat-square&logo=docker&logoColor=white)
-![Ubuntu](https://img.shields.io/badge/Ubuntu-E95420?style=flat-square&logo=ubuntu&logoColor=white)
-
----
-
 ## 🗂 데이터 계층
 
 데이터를 가공 수준과 사용 목적에 따라 Bronze–Silver–Gold 계층으로 분리했습니다.
@@ -156,3 +127,59 @@ Airflow DAG에서 배치 실행 전 스트리밍을 중지하고, 배치 완료 
 **결과**
 
 스트리밍과 배치의 자원 경쟁을 줄이면서 배치 작업을 안정적으로 완료했고, 스트리밍 중단 구간에 발생한 이벤트도 재시작 후 정상적으로 처리되는 것을 확인했습니다.
+
+---
+
+## 🚀 실행 흐름
+
+서비스별 Docker Compose 파일을 사용해 Kafka, Spark, MinIO, Airflow 및 모니터링 환경을 실행합니다.
+
+### 운영 환경
+
+1. `origin_data_processing`의 스크립트로 원본 데이터를 전처리하고 이벤트 데이터를 생성합니다.
+2. Kafka Producer를 실행해 주문·배송·리뷰 이벤트를 전송합니다.
+3. Spark Structured Streaming이 이벤트를 처리해 MinIO와 Redis에 저장합니다.
+4. Airflow가 스트리밍 중지 → 배치 처리 → 스트리밍 재시작 순서로 파이프라인을 제어합니다.
+5. Grafana와 Metabase에서 처리 상태와 데이터 마트를 확인합니다.
+
+### 부하 테스트 환경
+
+운영 환경과 분리된 스트리밍 컨테이너와 체크포인트를 사용합니다. Makefile을 통해 다음 과정을 자동화했습니다.
+
+- 테스트용 스트리밍 컨테이너 중지
+- MinIO·로컬 체크포인트 초기화
+- Kafka 테스트 토픽 삭제 및 재생성
+- Redis 테스트 캐시 초기화
+- 테스트용 스트리밍 컨테이너 재시작
+- 설정한 EPS로 테스트 이벤트 전송
+
+테스트 시에는 Kafka UI와 Metabase를 중지하고, `spark-streaming-load-test`와 Prometheus를 실행해 스트리밍 처리량과 컨테이너 자원을 측정합니다.
+
+---
+
+## 🛠 Tech Stack
+
+### Data Processing & Orchestration
+
+![Python](https://img.shields.io/badge/Python-3776AB?style=flat-square&logo=python&logoColor=white)
+![Apache Kafka](https://img.shields.io/badge/Apache_Kafka-231F20?style=flat-square&logo=apachekafka&logoColor=white)
+![Apache Spark](https://img.shields.io/badge/Apache_Spark-E25A1C?style=flat-square&logo=apachespark&logoColor=white)
+![Apache Airflow](https://img.shields.io/badge/Apache_Airflow-017CEE?style=flat-square&logo=apacheairflow&logoColor=white)
+
+### Storage & Database
+
+![MinIO](https://img.shields.io/badge/MinIO-C72E49?style=flat-square&logo=minio&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-4169E1?style=flat-square&logo=postgresql&logoColor=white)
+![Redis](https://img.shields.io/badge/Redis-FF4438?style=flat-square&logo=redis&logoColor=white)
+
+### Analytics & Monitoring
+
+![Metabase](https://img.shields.io/badge/Metabase-509EE3?style=flat-square&logo=metabase&logoColor=white)
+![Grafana](https://img.shields.io/badge/Grafana-F46800?style=flat-square&logo=grafana&logoColor=white)
+![Slack](https://img.shields.io/badge/Slack-4A154B?style=flat-square&logo=slack&logoColor=white)
+
+### Infrastructure
+
+![Oracle Cloud](https://img.shields.io/badge/Oracle_Cloud-F80000?style=flat-square&logo=oracle&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-2496ED?style=flat-square&logo=docker&logoColor=white)
+![Ubuntu](https://img.shields.io/badge/Ubuntu-E95420?style=flat-square&logo=ubuntu&logoColor=white)
