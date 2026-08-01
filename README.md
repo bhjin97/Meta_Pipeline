@@ -30,6 +30,20 @@
 ![Docker](https://img.shields.io/badge/Docker-2496ED?style=flat-square&logo=docker&logoColor=white)
 ![Ubuntu](https://img.shields.io/badge/Ubuntu-E95420?style=flat-square&logo=ubuntu&logoColor=white)
 
+## 🏗 Architecture
+
+<p align="center">
+  <img src="./Data_Eng_Project.drawio (4).png"
+       alt="E-Commerce Hybrid Data Pipeline Architecture"
+       width="100%">
+</p>
+
+주문·배송·리뷰 이벤트를 Kafka로 수집하고 Spark Structured Streaming으로 실시간 처리합니다.  
+원본 이벤트는 MinIO에 적재하며, 처리량과 누적 건수는 Redis와 Grafana를 통해 모니터링합니다.
+
+Airflow가 Spark Batch 작업을 오케스트레이션하여 Silver·Gold 계층과 분석용 마트를 생성합니다.  
+최종 데이터는 PostgreSQL에 적재하고 Metabase를 통해 시각화합니다.
+
 ## 📌 Project Overview
 
 이커머스 환경에서 발생하는 주문·배송·리뷰 이벤트를 실시간으로 수집하고,  
