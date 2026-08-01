@@ -49,10 +49,6 @@ Airflow가 Spark Batch 작업을 오케스트레이션하여 Silver·Gold 계층
 이커머스 환경에서 발생하는 주문·배송·리뷰 이벤트를 실시간으로 수집하고,  
 정적 데이터와 결합해 분석용 데이터 마트까지 제공하는 데이터 파이프라인을 구축했습니다.
 
-실시간 이벤트는 Kafka와 Spark Structured Streaming으로 수집·적재하고,  
-Airflow 기반 Spark Batch를 통해 Bronze–Silver–Gold 계층으로 정제합니다.  
-최종 데이터는 PostgreSQL과 Metabase를 통해 분석에 활용하며,  
-Grafana 모니터링과 Slack 실패 알림을 통해 운영 상태를 확인할 수 있도록 구성했습니다.
 
 | 항목 | 내용 |
 |---|---|
