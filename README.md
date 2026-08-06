@@ -7,14 +7,14 @@
 
 프로젝트의 설계 배경과 데이터 흐름, 주요 트러블슈팅 및 성능 테스트 결과를 발표자료로 정리했습니다.
 
-[📖 E-Commerce Hybrid Data Pipeline](./E-Commerce-Hybrid-Data-Pipeline.pdf)
+[📖 E-Commerce Hybrid Data Pipeline](./Docs/E-Commerce-Hybrid-Data-Pipeline.pdf)
 
 ---
 
 ## 🏗 Architecture
 
 <p align="center">
-  <img src="./Data_Eng_Project.drawio (4).png"
+  <img src="./Docs/Data_Eng_Project.drawio (4).png"
        alt="E-Commerce Hybrid Data Pipeline Architecture"
        width="100%">
 </p>
