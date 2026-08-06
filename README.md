@@ -3,6 +3,14 @@
 > Kafka와 Spark를 기반으로 실시간 이벤트와 배치 데이터를 통합 처리하고,  
 > Bronze–Silver–Gold 계층을 거쳐 분석용 데이터 마트로 제공하는 하이브리드 데이터 파이프라인입니다.
 
+## 📑 Presentation
+
+프로젝트의 설계 배경과 데이터 흐름, 주요 트러블슈팅 및 성능 테스트 결과를 발표자료로 정리했습니다.
+
+[📖 E-Commerce Hybrid Data Pipeline](./E-Commerce-Hybrid-Data-Pipeline.pdf)
+
+---
+
 ## 🏗 Architecture
 
 <p align="center">
