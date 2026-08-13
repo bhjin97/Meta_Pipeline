@@ -7,7 +7,12 @@
 
 프로젝트의 설계 배경과 데이터 흐름, 주요 트러블슈팅 및 성능 테스트 결과를 발표자료로 정리했습니다.
 
-[📖 E-Commerce Hybrid Data Pipeline](./Docs/E-Commerce-Hybrid-Data-Pipeline.pdf)
+- [📖 E-Commerce Hybrid Data Pipeline](./Docs/E-Commerce-Hybrid-Data-Pipeline.pdf)
+- 🎥 [E-Commerce Hybrid Data Pipeline 발표영상](https://www.youtube.com/watch?v=AOgdfq-37nA&t=204s)
+
+> **Note**  
+> 발표 영상은 프로젝트 1차 구현 시점의 내용이며, 이후 부하 테스트, 인덱스 성능 검증 및 파이프라인 안정화 작업을 추가로 진행했습니다.  
+> 현재 README와 발표자료는 이후 고도화된 프로젝트 내용을 기준으로 정리되어 있습니다.
 
 ---
 
