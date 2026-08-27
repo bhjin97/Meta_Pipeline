@@ -1,28 +1,36 @@
-from pyspark.sql import SparkSession
+from common.spark_session import create_spark_session
 
 
 def main():
-    spark = (
-        SparkSession.builder
-        .appName("Upload Persona Parquet To MinIO")
-        .config("spark.hadoop.fs.s3a.endpoint", "http://minio:9000")
-        .config("spark.hadoop.fs.s3a.access.key", "minioadmin")
-        .config("spark.hadoop.fs.s3a.secret.key", "minioadmin")
-        .config("spark.hadoop.fs.s3a.path.style.access", "true")
-        .config("spark.hadoop.fs.s3a.connection.ssl.enabled", "false")
-        .getOrCreate()
+    spark = create_spark_session(
+        "Upload Persona Pool To MinIO"
+    )
+    spark.sparkContext.setLogLevel("WARN")
+
+    input_path = (
+        "/app/origin_data_processing/scripts/data/raw/"
+        "nemotron_persona_korea_pool.parquet"
     )
 
-    input_path = "/app/data/raw/nemotron_persona_korea_sample.parquet"
-    output_path = "s3a://ecommerce/bronze/persona/nemotron_korea/"
+    output_path = (
+        "s3a://ecommerce/bronze/persona/nemotron_korea/"
+    )
 
     df = spark.read.parquet(input_path)
 
-    df.write.mode("overwrite").parquet(output_path)
+    print("[INFO] source schema")
+    df.printSchema()
 
-    print("upload completed")
-    print(f"row count: {df.count()}")
-    df.groupBy("sex").count().show(truncate=False)
+    print(f"[INFO] source row count: {df.count()}")
+
+    (
+        df.write
+        .mode("overwrite")
+        .parquet(output_path)
+    )
+
+    print("[SUCCESS] persona pool upload completed")
+    print(f"[INFO] output_path={output_path}")
 
     spark.stop()
 
