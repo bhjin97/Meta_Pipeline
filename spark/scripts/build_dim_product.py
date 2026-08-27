@@ -1,37 +1,81 @@
-from pyspark.sql import SparkSession
 from pyspark.sql.functions import col, coalesce, lit
+
 from common.spark_session import create_spark_session
 
 
+PRODUCTS_PATH = "s3a://ecommerce/bronze/olist/products/"
+CATEGORY_TRANSLATION_PATH = (
+    "s3a://ecommerce/bronze/reference/category_translation/"
+)
+OUTPUT_PATH = "s3a://ecommerce/silver/dim_product/"
+
+
 def main():
-    spark = create_spark_session()
+    spark = create_spark_session(
+        "Build Dim Product"
+    )
+    spark.sparkContext.setLogLevel("WARN")
 
-    products_path = "s3a://ecommerce/bronze/olist/products/"
-    translation_path = "s3a://ecommerce/bronze/reference/category_translation/"
-    output_path = "s3a://ecommerce/silver/dim_product/"
+    products_df = (
+        spark.read
+        .parquet(PRODUCTS_PATH)
+    )
 
-    products_df = spark.read.parquet(products_path)
-    translation_df = spark.read.parquet(translation_path)
+    category_translation_df = (
+        spark.read
+        .parquet(CATEGORY_TRANSLATION_PATH)
+    )
 
-    dim_product = (
-        products_df
-        .join(translation_df, on="product_category_name", how="left")
+    dim_product_df = (
+        products_df.alias("p")
+        .join(
+            category_translation_df.alias("t"),
+            on="product_category_name",
+            how="left",
+        )
         .select(
-            col("product_id"),
-            coalesce(col("product_category_name"), lit("unknown")).alias("product_category_name"),
-            coalesce(col("product_category_name_english"), lit("unknown")).alias("product_category_name_english"),
-            coalesce(col("product_photos_qty"), lit(0)).alias("product_photos_qty"),
-            col("product_weight_g"),
-            col("product_length_cm"),
-            col("product_height_cm"),
-            col("product_width_cm"),
+            col("p.product_id"),
+
+            coalesce(
+                col("p.product_category_name"),
+                lit("unknown"),
+            ).alias("product_category_name"),
+
+            coalesce(
+                col("t.product_category_name_english"),
+                lit("unknown"),
+            ).alias(
+                "product_category_name_english"
+            ),
+
+            # NULL은 "0개"가 아니라
+            # "정보 없음"일 수 있으므로 그대로 유지
+            col("p.product_photos_qty"),
+
+            col("p.product_weight_g"),
+            col("p.product_length_cm"),
+            col("p.product_height_cm"),
+            col("p.product_width_cm"),
         )
     )
 
-    dim_product.write.mode("overwrite").parquet(output_path)
+    row_count = dim_product_df.count()
 
-    print("dim_product build completed")
-    print(f"row count: {dim_product.count()}")
+    (
+        dim_product_df.write
+        .mode("overwrite")
+        .parquet(OUTPUT_PATH)
+    )
+
+    print(
+        "[SUCCESS] dim_product build completed"
+    )
+    print(
+        f"[INFO] row_count={row_count}"
+    )
+    print(
+        f"[INFO] output_path={OUTPUT_PATH}"
+    )
 
     spark.stop()
 
