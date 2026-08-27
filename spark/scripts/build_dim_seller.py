@@ -1,22 +1,10 @@
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import col
-
-
-def create_spark_session():
-    return (
-        SparkSession.builder
-        .appName("Build Dim Seller")
-        .config("spark.hadoop.fs.s3a.endpoint", "http://minio:9000")
-        .config("spark.hadoop.fs.s3a.access.key", "minioadmin")
-        .config("spark.hadoop.fs.s3a.secret.key", "minioadmin")
-        .config("spark.hadoop.fs.s3a.path.style.access", "true")
-        .config("spark.hadoop.fs.s3a.connection.ssl.enabled", "false")
-        .getOrCreate()
-    )
+from common.spark_session import create_spark_session
 
 
 def main():
-    spark = create_spark_session()
+    spark = create_spark_session("Build Dim Seller")
 
     sellers_path = "s3a://ecommerce/bronze/olist/sellers/"
     output_path = "s3a://ecommerce/silver/dim_seller/"
