@@ -6,15 +6,12 @@ from pyspark.sql.functions import (
     sum as spark_sum,
 )
 
+from common.postgres import read_from_postgres
 from common.spark_session import create_spark_session
 
 
 FACT_ORDER_ITEM_PATH = "s3a://ecommerce/silver/fact_order_item/"
 FACT_ORDER_EVENT_PATH = "s3a://ecommerce/silver/fact_order_event/"
-
-DAILY_PATH = "s3a://ecommerce/gold/mart_sales_daily/"
-MONTHLY_PATH = "s3a://ecommerce/gold/mart_sales_monthly/"
-
 
 def assert_equal(name, actual, expected, tolerance=0.001):
     if actual is None or expected is None:
@@ -91,14 +88,16 @@ def main():
     )
 
     daily_df = (
-        spark.read.parquet(
-            DAILY_PATH
+        read_from_postgres(
+            spark,
+            "mart_sales_daily",
         )
     )
 
     monthly_df = (
-        spark.read.parquet(
-            MONTHLY_PATH
+        read_from_postgres(
+            spark,
+            "mart_sales_monthly",
         )
     )
 

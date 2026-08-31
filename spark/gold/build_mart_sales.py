@@ -12,6 +12,7 @@ from pyspark.sql.functions import (
 )
 from pyspark.sql.window import Window
 
+from common.postgres import write_to_postgres
 from common.spark_session import create_spark_session
 
 
@@ -22,15 +23,6 @@ FACT_ORDER_ITEM_PATH = (
 FACT_ORDER_EVENT_PATH = (
     "s3a://ecommerce/silver/fact_order_event/"
 )
-
-DAILY_OUTPUT_PATH = (
-    "s3a://ecommerce/gold/mart_sales_daily/"
-)
-
-MONTHLY_OUTPUT_PATH = (
-    "s3a://ecommerce/gold/mart_sales_monthly/"
-)
-
 
 REQUIRED_ORDER_ITEM_COLUMNS = {
     "order_id",
@@ -520,25 +512,14 @@ def main():
         f"{monthly_count}"
     )
 
-    (
-        daily_df
-        .write
-        .mode("overwrite")
-        .partitionBy(
-            "year_month"
-        )
-        .parquet(
-            DAILY_OUTPUT_PATH
-        )
+    write_to_postgres(
+        daily_df,
+        "mart_sales_daily",
     )
 
-    (
-        monthly_df
-        .write
-        .mode("overwrite")
-        .parquet(
-            MONTHLY_OUTPUT_PATH
-        )
+    write_to_postgres(
+        monthly_df,
+        "mart_sales_monthly",
     )
 
     print(
@@ -548,12 +529,12 @@ def main():
 
     print(
         f"[INFO] daily_output="
-        f"{DAILY_OUTPUT_PATH}"
+        f"gold_staging.mart_sales_daily"
     )
 
     print(
         f"[INFO] monthly_output="
-        f"{MONTHLY_OUTPUT_PATH}"
+        f"gold_staging.mart_sales_monthly"
     )
 
     valid_order_items_df.unpersist()

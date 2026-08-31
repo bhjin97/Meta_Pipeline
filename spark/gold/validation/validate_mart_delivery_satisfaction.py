@@ -6,18 +6,13 @@ from pyspark.sql.functions import (
     row_number,
 )
 
+from common.postgres import read_from_postgres
 from common.spark_session import create_spark_session
 
 
 FACT_DELIVERY_PATH = "s3a://ecommerce/silver/fact_delivery/"
 FACT_REVIEW_PATH = "s3a://ecommerce/silver/fact_review/"
 FACT_ORDER_EVENT_PATH = "s3a://ecommerce/silver/fact_order_event/"
-MART_DELIVERY_PATH = (
-    "s3a://ecommerce/gold/"
-    "mart_delivery_satisfaction/"
-)
-
-
 REQUIRED_DELIVERY_COLUMNS = {
     "order_id",
     "is_delivered",
@@ -159,8 +154,9 @@ def main():
         FACT_ORDER_EVENT_PATH
     )
 
-    mart_delivery_df = spark.read.parquet(
-        MART_DELIVERY_PATH
+    mart_delivery_df = read_from_postgres(
+        spark,
+        "mart_delivery_satisfaction",
     )
 
     validate_required_columns(

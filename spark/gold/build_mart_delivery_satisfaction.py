@@ -7,6 +7,7 @@ from pyspark.sql.functions import (
     when,
 )
 
+from common.postgres import write_to_postgres
 from common.spark_session import create_spark_session
 
 
@@ -21,12 +22,6 @@ FACT_REVIEW_PATH = (
 FACT_ORDER_EVENT_PATH = (
     "s3a://ecommerce/silver/fact_order_event/"
 )
-
-OUTPUT_PATH = (
-    "s3a://ecommerce/gold/"
-    "mart_delivery_satisfaction/"
-)
-
 
 REQUIRED_DELIVERY_COLUMNS = {
     "order_id",
@@ -423,13 +418,9 @@ def main():
         f"{delayed_order_count}"
     )
 
-    (
-        mart_df
-        .write
-        .mode("overwrite")
-        .parquet(
-            OUTPUT_PATH
-        )
+    write_to_postgres(
+        mart_df,
+        "mart_delivery_satisfaction",
     )
 
     print(
@@ -439,7 +430,7 @@ def main():
 
     print(
         f"[INFO] output_path="
-        f"{OUTPUT_PATH}"
+        f"gold_staging.mart_delivery_satisfaction"
     )
 
     valid_delivery_df.unpersist()

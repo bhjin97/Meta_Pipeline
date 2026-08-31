@@ -7,14 +7,12 @@ from pyspark.sql.functions import (
     sum as spark_sum,
 )
 
+from common.postgres import read_from_postgres
 from common.spark_session import create_spark_session
 
 
 FACT_ORDER_ITEM_PATH = "s3a://ecommerce/silver/fact_order_item/"
 FACT_ORDER_EVENT_PATH = "s3a://ecommerce/silver/fact_order_event/"
-MART_CATEGORY_PATH = "s3a://ecommerce/gold/mart_category_daily/"
-
-
 REQUIRED_ORDER_ITEM_COLUMNS = {
     "order_id",
     "order_item_id",
@@ -154,7 +152,7 @@ def main():
 
     print(
         f"[INFO] mart_category_path="
-        f"{MART_CATEGORY_PATH}"
+        f"gold_staging.mart_category_daily"
     )
 
     fact_order_item_df = (
@@ -170,8 +168,9 @@ def main():
     )
 
     mart_category_df = (
-        spark.read.parquet(
-            MART_CATEGORY_PATH
+        read_from_postgres(
+            spark,
+            "mart_category_daily",
         )
     )
 

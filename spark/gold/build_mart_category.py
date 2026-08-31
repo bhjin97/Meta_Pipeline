@@ -10,15 +10,13 @@ from pyspark.sql.functions import (
     when,
 )
 
+from common.postgres import write_to_postgres
 from common.spark_session import create_spark_session
 
 
 FACT_ORDER_ITEM_PATH = "s3a://ecommerce/silver/fact_order_item/"
 FACT_ORDER_EVENT_PATH = "s3a://ecommerce/silver/fact_order_event/"
 DIM_PRODUCT_PATH = "s3a://ecommerce/silver/dim_product/"
-
-OUTPUT_PATH = "s3a://ecommerce/gold/mart_category_daily/"
-
 
 REQUIRED_ORDER_ITEM_COLUMNS = {
     "order_id",
@@ -372,16 +370,9 @@ def main():
         f"{category_count}"
     )
 
-    (
-        mart_df
-        .write
-        .mode("overwrite")
-        .partitionBy(
-            "year_month"
-        )
-        .parquet(
-            OUTPUT_PATH
-        )
+    write_to_postgres(
+        mart_df,
+        "mart_category_daily",
     )
 
     print(
@@ -391,7 +382,7 @@ def main():
 
     print(
         f"[INFO] output_path="
-        f"{OUTPUT_PATH}"
+        f"gold_staging.mart_category_daily"
     )
 
     valid_order_items_df.unpersist()

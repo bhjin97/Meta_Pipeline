@@ -8,15 +8,13 @@ from pyspark.sql.functions import (
     sum as spark_sum,
 )
 
+from common.postgres import read_from_postgres
 from common.spark_session import create_spark_session
 
 
 FACT_ORDER_ITEM_PATH = "s3a://ecommerce/silver/fact_order_item/"
 FACT_ORDER_EVENT_PATH = "s3a://ecommerce/silver/fact_order_event/"
 DIM_CUSTOMER_PATH = "s3a://ecommerce/silver/dim_customer/"
-MART_CUSTOMER_PATH = "s3a://ecommerce/gold/mart_customer_summary/"
-
-
 REQUIRED_ORDER_ITEM_COLUMNS = {
     "order_id",
     "order_item_id",
@@ -136,8 +134,9 @@ def main():
         DIM_CUSTOMER_PATH
     )
 
-    mart_customer_df = spark.read.parquet(
-        MART_CUSTOMER_PATH
+    mart_customer_df = read_from_postgres(
+        spark,
+        "mart_customer_summary",
     )
 
     validate_required_columns(
