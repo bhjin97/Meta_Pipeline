@@ -1,6 +1,7 @@
 from pyspark.sql.functions import col
 
 from common.spark_session import create_spark_session
+from pyspark.sql.functions import col, date_format
 
 
 FACT_PATH = (
@@ -119,38 +120,7 @@ def main():
     invalid_date_key_count = (
         df.filter(
             col("date_key")
-            != col("event_date")
-            .cast("string")
-            .substr(1, 10)
-            .cast("date")
-            .cast("string")
-            .substr(1, 4)
-            .concat(
-                col("event_date")
-                .cast("string")
-                .substr(6, 2)
-            )
-            .concat(
-                col("event_date")
-                .cast("string")
-                .substr(9, 2)
-            )
-            .cast("int")
-        )
-        .count()
-    )
-
-    # 위 표현보다 명확한 검증을 위해
-    # Spark date_format을 별도로 사용하는 것이 좋다.
-    from pyspark.sql.functions import date_format
-
-    invalid_date_key_count = (
-        df.filter(
-            col("date_key")
-            != date_format(
-                col("event_date"),
-                "yyyyMMdd",
-            ).cast("int")
+            != date_format(col("event_date"), "yyyyMMdd").cast("int")
         )
         .count()
     )
