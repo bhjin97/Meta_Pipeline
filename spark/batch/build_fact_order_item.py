@@ -433,6 +433,10 @@ def main():
             fact_order_item_df,
             existing_df,
         )
+        print("=== PHYSICAL PLAN ===")
+        new_fact_df.explain("formatted")
+
+        new_row_count = new_fact_df.count()
 
     else:
         print(
