@@ -16,6 +16,8 @@ services:
     volumes:
       - ../:/app
       - spark-ivy:/opt/spark/.ivy2
+      - spark-events:/spark-events
+      - ../spark/conf/spark-defaults.conf:/opt/spark/conf/spark-defaults.conf:ro
     networks:
       - data-pipeline-net
     cpus: 0.5
@@ -39,6 +41,8 @@ services:
     volumes:
       - ../:/app
       - spark-ivy:/opt/spark/.ivy2
+      - spark-events:/spark-events
+      - ../spark/conf/spark-defaults.conf:/opt/spark/conf/spark-defaults.conf:ro
     networks:
       - data-pipeline-net
     cpus: 2
@@ -58,6 +62,8 @@ services:
     volumes:
       - ../:/app
       - spark-ivy:/opt/spark/.ivy2
+      - spark-events:/spark-events
+      - ../spark/conf/spark-defaults.conf:/opt/spark/conf/spark-defaults.conf:ro
     environment:
       - PYTHONPATH=/app/spark
     networks:
@@ -87,10 +93,32 @@ services:
     volumes: 
       - ../:/app 
       - spark-ivy:/opt/spark/.ivy2 
+      - spark-events:/spark-events
+      - ../spark/conf/spark-defaults.conf:/opt/spark/conf/spark-defaults.conf:ro
     networks: 
       - data-pipeline-net 
     cpus: 0.5 
     mem_limit: 1536m 
+    restart: unless-stopped
+
+  spark-history-server:
+    build: .
+    image: apache/spark:3.5.1
+    container_name: spark-history-server
+    command: >
+      /opt/spark/bin/spark-class
+      org.apache.spark.deploy.history.HistoryServer
+    ports:
+      - "18081:18080"
+    environment:
+      - SPARK_HISTORY_OPTS=-Dspark.history.fs.logDirectory=file:///spark-events
+    volumes:
+      - spark-events:/spark-events
+      - ../spark/conf/spark-defaults.conf:/opt/spark/conf/spark-defaults.conf:ro
+    networks:
+      - data-pipeline-net
+    cpus: 0.25
+    mem_limit: 512m
     restart: unless-stopped
 
   redis:
@@ -168,6 +196,7 @@ networks:
 
 volumes:
   spark-ivy:
+  spark-events:
   redis-data:
   postgres-data:
   metabase-data:
