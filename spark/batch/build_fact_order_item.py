@@ -347,7 +347,23 @@ def main():
         "Build Fact Order Item"
     )
     spark.sparkContext.setLogLevel("WARN")
-
+    print("=== Spark Join Config ===")
+    print(
+        "autoBroadcastJoinThreshold =",
+        spark.conf.get("spark.sql.autoBroadcastJoinThreshold")
+    )
+    print(
+        "AQE enabled =",
+        spark.conf.get("spark.sql.adaptive.enabled")
+    )
+    print(
+        "shuffle partitions =",
+        spark.conf.get("spark.sql.shuffle.partitions")
+    )
+    print(
+        "preferSortMergeJoin =",
+        spark.conf.get("spark.sql.join.preferSortMergeJoin")
+    )
     (
         order_events_path,
         order_items_path,
