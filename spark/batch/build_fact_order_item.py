@@ -8,6 +8,7 @@ from pyspark.sql.functions import (
     to_timestamp,
 )
 from pyspark.sql.utils import AnalysisException
+from pyspark import StorageLevel
 
 from common.spark_session import create_spark_session
 
@@ -409,6 +410,8 @@ def main():
             customers_df,
             dim_customer_df,
         )
+        .persist(StorageLevel.MEMORY_AND_DISK)
+
     )
 
     validate_before_write(
@@ -452,7 +455,7 @@ def main():
         print("=== PHYSICAL PLAN ===")
         new_fact_df.explain("formatted")
 
-        new_row_count = new_fact_df.count()
+        #new_row_count = new_fact_df.count()
 
     else:
         print(
@@ -472,6 +475,7 @@ def main():
             "[INFO] No new order items "
             "to process"
         )
+        fact_order_item_df.unpersist()
         spark.stop()
         return
 
@@ -481,6 +485,8 @@ def main():
         .partitionBy("order_month")
         .parquet(output_path)
     )
+
+    fact_order_item_df.unpersist()
 
     print(
         "[SUCCESS] fact_order_item "
