@@ -60,6 +60,7 @@ services:
       AIRFLOW__CORE__MAX_ACTIVE_TASKS_PER_DAG: "1"
       SLACK_WEBHOOK_URL: ${SLACK_WEBHOOK_URL}
       AIRFLOW_CONN_ECOMMERCE_POSTGRES: ${AIRFLOW_CONN_ECOMMERCE_POSTGRES}
+      PYTHONPATH: "/opt/airflow/plugins:/app"
     ports:
       - "8081:8080"
     volumes:
@@ -94,6 +95,7 @@ services:
       AIRFLOW__CORE__MAX_ACTIVE_TASKS_PER_DAG: "1"
       SLACK_WEBHOOK_URL: ${SLACK_WEBHOOK_URL}
       AIRFLOW_CONN_ECOMMERCE_POSTGRES: ${AIRFLOW_CONN_ECOMMERCE_POSTGRES}
+      PYTHONPATH: "/opt/airflow/plugins:/app"
     volumes:
       - ./dags:/opt/airflow/dags
       - ./logs:/opt/airflow/logs
