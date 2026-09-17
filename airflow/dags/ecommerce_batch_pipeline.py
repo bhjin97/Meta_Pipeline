@@ -293,6 +293,18 @@ with DAG(
             )
         )
 
+        mark_fact_review_initialized = (
+            create_spark_task(
+                task_id=(
+                    "mark_fact_review_initialized"
+                ),
+                application=(
+                    "/app/spark/batch/"
+                    "mark_fact_review_initialized.py"
+                ),
+            )
+        )
+
 
     # ========================================================
     # Gold Layer
@@ -451,7 +463,11 @@ with DAG(
 
     build_fact_delivery >> validate_fact_delivery
 
-    build_fact_review >> validate_fact_review
+    (
+        build_fact_review
+        >> validate_fact_review
+        >> mark_fact_review_initialized
+    )
 
     validation_layer >> gold_layer
 

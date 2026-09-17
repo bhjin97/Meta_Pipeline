@@ -34,10 +34,29 @@ OUTPUT_PATH = (
     "s3a://ecommerce/silver/fact_review/"
 )
 
+INITIAL_LOAD_MARKER_PATH = (
+    "s3a://ecommerce/state/fact_review/"
+    "_INITIAL_LOAD_SUCCESS"
+)
+
 
 # ============================================================
 # Existing Fact
 # ============================================================
+
+def path_exists(spark, path):
+    jvm = spark._jvm
+    hadoop_conf = spark._jsc.hadoopConfiguration()
+
+    fs = jvm.org.apache.hadoop.fs.FileSystem.get(
+        jvm.java.net.URI(path),
+        hadoop_conf,
+    )
+
+    return fs.exists(
+        jvm.org.apache.hadoop.fs.Path(path)
+    )
+
 
 def read_existing_review_keys(spark):
     """
@@ -46,9 +65,7 @@ def read_existing_review_keys(spark):
     Grain:
         (review_id, order_id)
 
-    반환:
-        existing_keys_df
-        is_initial_load
+    Incremental Load에서 처리 완료된 Grain Key를 반환한다.
     """
 
     try:
@@ -76,34 +93,16 @@ def read_existing_review_keys(spark):
             )
         )
 
-        return (
-            existing_keys_df,
-            False,
-        )
+        return existing_keys_df
 
     except AnalysisException as e:
         if "PATH_NOT_FOUND" not in str(e):
             raise
 
-        print(
-            "[INFO] No existing fact_review found. "
-            "Running historical initial load."
-        )
-
-        empty_df = (
-            spark.createDataFrame(
-                [],
-                """
-                review_id string,
-                order_id string
-                """,
-            )
-        )
-
-        return (
-            empty_df,
-            True,
-        )
+        raise RuntimeError(
+            "Initial load marker exists, but "
+            "fact_review output does not exist."
+        ) from e
 
 
 # ============================================================
@@ -622,6 +621,11 @@ def main():
         f"{OUTPUT_PATH}"
     )
 
+    print(
+        f"[INFO] initial_load_marker_path="
+        f"{INITIAL_LOAD_MARKER_PATH}"
+    )
+
     # --------------------------------------------------------
     # 1. Bronze review 상세 읽기
     # --------------------------------------------------------
@@ -638,11 +642,14 @@ def main():
     # 2. Initial / Incremental 판단
     # --------------------------------------------------------
 
-    (
-        existing_review_keys_df,
-        is_initial_load,
-    ) = read_existing_review_keys(
-        spark
+    is_initial_load = not path_exists(
+        spark,
+        INITIAL_LOAD_MARKER_PATH,
+    )
+
+    print(
+        f"[INFO] initial_load_marker_exists="
+        f"{not is_initial_load}"
     )
 
     # --------------------------------------------------------
@@ -673,6 +680,10 @@ def main():
         #
         # REVIEW_CREATED 이벤트에서 신규 pair만 처리한다.
         # ====================================================
+
+        existing_review_keys_df = (
+            read_existing_review_keys(spark)
+        )
 
         review_events_df = (
             build_review_events(spark)
@@ -766,9 +777,15 @@ def main():
     # 7. Write
     # --------------------------------------------------------
 
+    write_mode = (
+        "overwrite"
+        if is_initial_load
+        else "append"
+    )
+
     (
         fact_review_df.write
-        .mode("append")
+        .mode(write_mode)
         .partitionBy(
             "review_month"
         )
@@ -790,6 +807,10 @@ def main():
     print(
         f"[INFO] load_type="
         f"{'historical_backfill' if is_initial_load else 'incremental'}"
+    )
+
+    print(
+        f"[INFO] write_mode={write_mode}"
     )
 
     print(

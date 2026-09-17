@@ -13,6 +13,15 @@ FACT_REVIEW_PATH = (
     "s3a://ecommerce/silver/fact_review/"
 )
 
+REVIEWS_PATH = (
+    "s3a://ecommerce/bronze/olist/reviews/"
+)
+
+INITIAL_LOAD_MARKER_PATH = (
+    "s3a://ecommerce/state/fact_review/"
+    "_INITIAL_LOAD_SUCCESS"
+)
+
 
 EXPECTED_COLUMNS = {
     "review_id",
@@ -26,6 +35,85 @@ EXPECTED_COLUMNS = {
     "review_date",
     "review_month",
 }
+
+
+def path_exists(spark, path):
+    jvm = spark._jvm
+    hadoop_conf = spark._jsc.hadoopConfiguration()
+
+    fs = jvm.org.apache.hadoop.fs.FileSystem.get(
+        jvm.java.net.URI(path),
+        hadoop_conf,
+    )
+
+    return fs.exists(
+        jvm.org.apache.hadoop.fs.Path(path)
+    )
+
+
+def validate_initial_completeness(spark, target_df):
+    source_keys_df = (
+        spark.read
+        .parquet(REVIEWS_PATH)
+        .select(
+            "review_id",
+            "order_id",
+        )
+        .dropDuplicates()
+    )
+
+    target_keys_df = (
+        target_df
+        .select(
+            "review_id",
+            "order_id",
+        )
+        .dropDuplicates()
+    )
+
+    missing_key_count = (
+        source_keys_df
+        .join(
+            target_keys_df,
+            on=[
+                "review_id",
+                "order_id",
+            ],
+            how="left_anti",
+        )
+        .count()
+    )
+
+    unexpected_key_count = (
+        target_keys_df
+        .join(
+            source_keys_df,
+            on=[
+                "review_id",
+                "order_id",
+            ],
+            how="left_anti",
+        )
+        .count()
+    )
+
+    if (
+        missing_key_count > 0
+        or unexpected_key_count > 0
+    ):
+        raise RuntimeError(
+            "Initial fact_review completeness "
+            "validation failed. "
+            f"missing_key_count={missing_key_count}, "
+            f"unexpected_key_count="
+            f"{unexpected_key_count}"
+        )
+
+    print(
+        "[PASS] Initial completeness validation "
+        "missing_key_count=0, "
+        "unexpected_key_count=0"
+    )
 
 
 def validate_schema(df):
@@ -438,6 +526,20 @@ def main():
     validate_date_key(df)
 
     validate_review_month(df)
+
+    if path_exists(
+        spark,
+        INITIAL_LOAD_MARKER_PATH,
+    ):
+        print(
+            "[INFO] Initial load marker exists. "
+            "Initial completeness validation skipped."
+        )
+    else:
+        validate_initial_completeness(
+            spark,
+            df,
+        )
 
     print(
         "[SUCCESS] "
