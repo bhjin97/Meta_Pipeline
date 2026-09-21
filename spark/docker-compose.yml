@@ -36,6 +36,7 @@ services:
     environment:
       - SPARK_WORKER_CORES=2
       - SPARK_WORKER_MEMORY=6G
+      - SPARK_WORKER_OPTS=-Dspark.worker.cleanup.enabled=true -Dspark.worker.cleanup.interval=1800 -Dspark.worker.cleanup.appDataTtl=172800
       - SPARK_SUBMIT_OPTS=-Divy.home=/opt/spark/.ivy2 -Divy.cache.dir=/opt/spark/.ivy2/cache
       - PYTHONPATH=/app/spark
     volumes:
