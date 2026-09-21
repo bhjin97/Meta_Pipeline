@@ -29,4 +29,7 @@ RUN pip install --no-cache-dir \
     "apache-airflow-providers-postgres==5.13.0" \
     "pyspark==3.5.1"  \
     "psycopg2-binary" \
-    "docker"
+    "docker" \
+    "numpy==1.24.4" \
+    "pandas==2.0.3" \
+    "pyarrow==16.1.0"
