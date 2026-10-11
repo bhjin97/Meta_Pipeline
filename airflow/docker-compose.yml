@@ -79,6 +79,7 @@ services:
   airflow-scheduler:
     group_add:
       - "121"
+      - "185"
     build: .
     container_name: airflow-scheduler
     depends_on:
@@ -102,6 +103,7 @@ services:
       - ./plugins:/opt/airflow/plugins
       - ../:/app
       - airflow-ivy-cache:/home/airflow/.ivy2
+      - spark-events:/spark-events
       - /var/run/docker.sock:/var/run/docker.sock
     networks:
       - data-pipeline-net
@@ -116,3 +118,6 @@ networks:
 volumes:
   airflow-postgres-data:
   airflow-ivy-cache:
+  spark-events:
+    external: true
+    name: spark_spark-events

@@ -22,6 +22,8 @@ MINIO_ACCESS_KEY = os.getenv("MINIO_ACCESS_KEY")
 MINIO_SECRET_KEY = os.getenv("MINIO_SECRET_KEY")
 
 SPARK_CONF = {
+    "spark.eventLog.enabled": "true",
+    "spark.eventLog.dir": "file:///spark-events",
     "spark.hadoop.fs.s3a.endpoint": MINIO_ENDPOINT,
     "spark.hadoop.fs.s3a.access.key": MINIO_ACCESS_KEY,
     "spark.hadoop.fs.s3a.secret.key": MINIO_SECRET_KEY,
